@@ -11,7 +11,9 @@ O relevo é gerado de forma procedural, e não é uma cópia topográfica exata 
 
 ## Jogar
 
-Abra `docs/index.html` num servidor web (veja abaixo) ou publique no GitHub Pages.
+▶️ **[Jogue agora no navegador](https://dliedke.github.io/emilius_wingsuit/)**
+
+Ou abra `docs/index.html` num servidor web (veja abaixo) ou publique no seu próprio GitHub Pages.
 Funciona em Chrome, Edge, Firefox e Safari recentes (precisa de WebGL 2). No celular também dá para jogar, com controles de toque.
 
 ### Publicar no GitHub Pages
