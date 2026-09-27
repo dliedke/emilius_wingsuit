@@ -1,0 +1,341 @@
+<title>Emilius Wingsuit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Chivo+Mono:wght@400;600;700&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --ink: #0a1418;
+  --panel: rgba(7, 16, 20, 0.58);
+  --panel-strong: rgba(7, 16, 20, 0.86);
+  --line: rgba(230, 240, 236, 0.18);
+  --snow: #eef3f1;
+  --mist: #a8bcc2;
+  --dim: #6f8990;
+  --signal: #ff6b1a;
+  --signal-soft: rgba(255, 107, 26, 0.18);
+  --lake: #3fd0c4;
+  --danger: #ff4a36;
+  --good: #9be27f;
+  --f-display: 'Big Shoulders Display', 'Arial Narrow', Impact, sans-serif;
+  --f-ui: 'Barlow Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --f-data: 'Chivo Mono', ui-monospace, Menlo, Consolas, monospace;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--ink); color: var(--snow); font-family: var(--f-ui); overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+button { font-family: var(--f-ui); color: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-offset: 3px; }
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+
+/* overlays */
+#mist, #vignette, #flash { position: fixed; inset: 0; pointer-events: none; }
+#mist { background: radial-gradient(ellipse at center, rgba(236,242,246,0.78), rgba(222,232,238,0.95)); opacity: 0; }
+#vignette { background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 74, 54, 0.55) 100%); opacity: 0; transition: opacity .15s; }
+#flash { background: #fff; opacity: 0; }
+.scrim { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(6,14,18,0.82) 0%, rgba(6,14,18,0.55) 34%, rgba(6,14,18,0) 62%); }
+
+/* ------------------------------------------------ loading */
+#loading { position: fixed; inset: 0; display: flex; align-items: flex-end; padding: calc(28px + var(--safe-t)) max(24px, var(--safe-r)) calc(40px + var(--safe-b)) max(24px, var(--safe-l)); background:
+  radial-gradient(1200px 700px at 78% 18%, rgba(63,208,196,0.10), transparent 60%),
+  linear-gradient(180deg, #0c1a20 0%, #0a1418 100%); }
+#loading .wrap { max-width: 560px; width: 100%; display: grid; gap: 14px; }
+.eyebrow { font-family: var(--f-data); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mist); }
+.title { font-family: var(--f-display); font-weight: 900; font-size: clamp(64px, 13vw, 148px); line-height: 0.82; letter-spacing: 0.01em; margin: 0; text-wrap: balance; }
+.title em { font-style: normal; color: var(--signal); }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0%; background: var(--signal); transition: width .2s; }
+#loadmsg { font-size: 15px; color: var(--mist); }
+#loaderr { color: var(--danger); font-size: 15px; line-height: 1.4; }
+
+/* ------------------------------------------------ menu */
+#menu { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: calc(24px + var(--safe-t)) max(24px, var(--safe-r)) calc(24px + var(--safe-b)) max(28px, calc(24px + var(--safe-l))); }
+#menu .col { max-width: 520px; display: grid; gap: 18px; position: relative; }
+.sub { font-family: var(--f-display); font-weight: 700; font-size: clamp(22px, 3.4vw, 30px); letter-spacing: 0.06em; text-transform: uppercase; color: var(--snow); margin-top: -6px; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--f-data); font-size: 13px; color: var(--mist); }
+.stats b { color: var(--snow); font-weight: 600; }
+.menu-btns { display: grid; gap: 8px; margin-top: 6px; justify-items: start; }
+.mbtn { background: none; border: 0; padding: 4px 0; font-family: var(--f-display); font-weight: 800; font-size: 30px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--snow); cursor: pointer; display: inline-flex; align-items: baseline; gap: 12px; }
+.mbtn small { font-family: var(--f-data); font-size: 12px; font-weight: 400; letter-spacing: 0.08em; color: var(--dim); }
+.mbtn:hover { color: var(--signal); }
+.mbtn.primary { font-size: 44px; color: var(--signal); }
+.mbtn.primary:hover { color: var(--snow); }
+.record { font-family: var(--f-data); font-size: 13px; color: var(--mist); }
+.credit { position: fixed; right: max(20px, var(--safe-r)); bottom: calc(16px + var(--safe-b)); font-size: 13px; color: var(--mist); text-align: right; max-width: 60vw; }
+.credit a { color: var(--snow); }
+
+/* ------------------------------------------------ HUD */
+#hud { position: fixed; inset: 0; pointer-events: none; }
+.hud-card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+#hud-left { position: absolute; left: max(14px, var(--safe-l)); top: calc(14px + var(--safe-t)); display: grid; grid-template-columns: auto auto; gap: 8px; align-items: start; }
+#tape { width: 50px; height: clamp(140px, 30vh, 250px); display: block; }
+.readouts { display: grid; gap: clamp(4px, 1.1vh, 9px); padding: 8px 11px; min-width: 104px; }
+.ro .k { font-family: var(--f-data); font-size: 9.5px; letter-spacing: 0.14em; color: var(--mist); text-transform: uppercase; }
+.ro .v { font-family: var(--f-data); font-size: clamp(15px, 2.5vh, 20px); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.ro .v small { font-size: 11px; color: var(--mist); margin-left: 3px; font-weight: 400; }
+.ro.big .v { font-size: clamp(20px, 3.6vh, 28px); }
+.ro.warn .v { color: var(--signal); }
+#hud-right { position: absolute; right: max(14px, var(--safe-r)); top: calc(14px + var(--safe-t)); padding: 8px 12px; display: grid; gap: 5px; min-width: 132px; text-align: right; }
+#score { font-family: var(--f-display); font-weight: 900; font-size: clamp(26px, 5vh, 40px); line-height: 0.9; font-variant-numeric: tabular-nums; }
+#mult { font-family: var(--f-display); font-weight: 800; font-size: clamp(16px, 2.6vh, 21px); color: var(--lake); }
+.line2 { font-family: var(--f-data); font-size: 12px; color: var(--mist); display: flex; justify-content: space-between; gap: 12px; }
+.line2 b { color: var(--snow); font-weight: 600; }
+#hud-bottom { position: absolute; left: 50%; bottom: calc(14px + var(--safe-b)); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; padding: 8px 16px 10px; width: min(360px, 56vw); }
+.speedrow { display: flex; align-items: baseline; gap: 16px; }
+#spd { font-family: var(--f-display); font-weight: 900; font-size: clamp(34px, 7vh, 58px); line-height: 0.85; font-variant-numeric: tabular-nums; min-width: 2.6ch; text-align: right; }
+.unit { font-family: var(--f-data); font-size: 12px; color: var(--mist); letter-spacing: 0.1em; }
+.sidevals { display: grid; gap: 2px; font-family: var(--f-data); font-size: 13px; color: var(--mist); }
+.sidevals b { color: var(--snow); font-weight: 600; }
+.prox { width: 100%; display: grid; gap: 4px; }
+.prox .lbl { display: flex; justify-content: space-between; font-family: var(--f-data); font-size: 10px; letter-spacing: 0.12em; color: var(--mist); text-transform: uppercase; }
+.proxbar { position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; }
+.proxbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, var(--lake), #ffd24a 55%, var(--signal) 80%, var(--danger)); }
+.proxbar s { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.5); }
+#hud-msg { position: absolute; left: 50%; top: calc(18% + var(--safe-t)); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
+.callout { font-family: var(--f-display); font-weight: 900; font-size: clamp(30px, 5vw, 52px); letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 2px 18px rgba(0,0,0,0.45); animation: pop 1.6s ease-out forwards; white-space: nowrap; }
+.callout.small { font-size: clamp(18px, 2.6vw, 26px); font-weight: 800; }
+.callout.orange { color: var(--signal); }
+.callout.lake { color: var(--lake); }
+.callout.red { color: var(--danger); }
+@keyframes pop { 0% { opacity: 0; transform: translateY(8px) scale(0.92); } 10% { opacity: 1; transform: translateY(0) scale(1.04); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
+#prompt { position: absolute; left: 50%; bottom: calc(36% + var(--safe-b)); transform: translateX(-50%); font-family: var(--f-display); font-weight: 800; font-size: clamp(22px, 3vw, 30px); letter-spacing: 0.06em; text-transform: uppercase; text-align: center; text-shadow: 0 2px 14px rgba(0,0,0,0.5); }
+#prompt small { display: block; margin-top: 8px; font-family: var(--f-ui); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
+#prompt.blink small { display: none; }
+#prompt kbd { font-family: var(--f-data); font-size: 0.6em; padding: 3px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); vertical-align: middle; }
+#prompt.blink { animation: blink 0.8s steps(2) infinite; color: var(--signal); }
+#prompt.top { bottom: auto; top: calc(27% + var(--safe-t)); }
+@keyframes blink { 50% { opacity: 0.25; } }
+#minimap { position: absolute; left: max(14px, var(--safe-l)); bottom: calc(14px + var(--safe-b)); width: clamp(92px, 10.5vw, 140px); aspect-ratio: 300 / 480; }
+#minimap canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 6px; }
+#lzmark { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity .45s; will-change: transform; }
+#lzmark.on { opacity: 1; }
+#lzmark.dim { opacity: 0.4; }
+.lzm-ring { position: absolute; --r: var(--rs, 38px); left: calc(var(--r) / -2); top: calc(var(--r) / -2); width: var(--r); height: var(--r); box-sizing: border-box; border: 3px solid var(--signal); border-radius: 50%; box-shadow: 0 0 0 2px rgba(10,20,24,.55), inset 0 0 0 2px rgba(10,20,24,.35), 0 0 18px rgba(255,107,26,.55); animation: lzpulse 1.6s ease-in-out infinite; }
+.lzm-ring::before, .lzm-ring::after { content: ''; position: absolute; background: var(--signal); box-shadow: 0 0 0 1.5px rgba(10,20,24,.5); }
+.lzm-ring::before { left: 50%; top: -12px; width: 3px; height: 9px; margin-left: -1.5px; }
+.lzm-ring::after { left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; }
+@keyframes lzpulse { 50% { transform: scale(1.14); } }
+.lzm-arrow { position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; display: none; background: var(--signal); clip-path: polygon(100% 50%, 12% 8%, 30% 50%, 12% 92%); filter: drop-shadow(0 0 3px rgba(0,0,0,.6)); }
+#lzmark.edge .lzm-ring { display: none; }
+#lzmark.edge .lzm-arrow { display: block; }
+.lzm-lbl { position: absolute; left: 0; top: calc(var(--rs, 38px) / 2 + 8px); transform: translateX(-50%); white-space: nowrap; text-align: center; font-family: var(--f-data); font-size: 12px; line-height: 1.35; color: var(--snow); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 3px 8px 4px; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+#lzmark.edge .lzm-lbl { top: 24px; }
+#lzmark.up .lzm-lbl { top: auto; bottom: 24px; }
+#lzmark.al .lzm-lbl { transform: translateX(-24px); }
+#lzmark.ar .lzm-lbl { transform: translateX(calc(-100% + 24px)); }
+.lzm-top b { color: var(--signal); font-weight: 700; letter-spacing: 0.1em; }
+#lzm-d { font-weight: 700; font-size: 14px; }
+#lzm-h { color: var(--mist); font-size: 11px; }
+#lzm-hint { font-family: var(--f-ui); font-weight: 700; font-size: 13px; letter-spacing: 0.02em; }
+#lzm-hint:empty { display: none; }
+#lzm-hint.good { color: var(--good); }
+#lzm-hint.warn { color: #ffd24a; }
+#lzm-hint.bad { color: var(--danger); }
+@media (prefers-reduced-motion: reduce) { .lzm-ring { animation: none; } }
+#camtag { position: absolute; right: max(14px, var(--safe-r)); bottom: calc(14px + var(--safe-b)); font-family: var(--f-data); font-size: 11px; color: var(--mist); letter-spacing: 0.08em; text-align: right; line-height: 1.6; }
+#camtag b { color: var(--snow); }
+#replaytag { position: absolute; left: 50%; top: calc(16px + var(--safe-t)); transform: translateX(-50%); font-family: var(--f-display); font-weight: 900; font-size: 22px; letter-spacing: 0.3em; color: var(--signal); display: flex; gap: 14px; align-items: center; pointer-events: auto; }
+#replaytag button { pointer-events: auto; font-size: 13px; letter-spacing: 0.1em; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-family: var(--f-data); }
+
+/* ------------------------------------------------ panels */
+.modal { position: fixed; inset: 0; display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: calc(20px + var(--safe-t)) 16px calc(20px + var(--safe-b)); background: rgba(5,11,14,0.45); }
+.card { width: min(560px, 100%); margin: auto 0; background: var(--panel-strong); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; display: grid; gap: 16px; }
+@media (max-height: 500px) {
+  .card { padding: 14px 18px; gap: 10px; }
+  .card h2 { font-size: 34px; }
+  .tbl { font-size: 14px; gap: 2px 14px; }
+  .tbl .tot { font-size: 22px; padding-top: 4px; }
+  .btn { padding: 8px 12px; font-size: 15px; }
+}
+.card h2 { font-family: var(--f-display); font-weight: 900; font-size: clamp(36px, 7vw, 56px); line-height: 0.9; margin: 0; text-transform: uppercase; letter-spacing: 0.02em; text-wrap: balance; }
+.card h2.bad { color: var(--danger); }
+.card h2.good { color: var(--good); }
+.card .why { color: var(--mist); font-size: 16px; margin-top: -8px; }
+.tbl { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 16px; }
+.tbl span:nth-child(odd) { color: var(--mist); }
+.tbl span:nth-child(even) { font-family: var(--f-data); font-variant-numeric: tabular-nums; text-align: right; }
+.tbl .tot { color: var(--snow) !important; font-family: var(--f-display) !important; font-weight: 900; font-size: 30px; padding-top: 8px; border-top: 1px solid var(--line); }
+.newrec { font-family: var(--f-display); font-weight: 800; font-size: 20px; letter-spacing: 0.08em; color: var(--signal); text-transform: uppercase; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { border: 1px solid var(--line); background: rgba(255,255,255,0.04); border-radius: 6px; padding: 10px 16px; font-size: 17px; font-weight: 600; cursor: pointer; letter-spacing: 0.02em; }
+.btn:hover { border-color: var(--snow); }
+.btn.primary { background: var(--signal); border-color: var(--signal); color: #1a0d05; }
+.btn.primary:hover { background: #ff8440; }
+.btn kbd { font-family: var(--f-data); font-size: 12px; opacity: 0.7; margin-left: 6px; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; font-size: 15px; align-items: baseline; }
+.keys kbd { font-family: var(--f-data); font-size: 12px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 4px; background: rgba(255,255,255,0.06); white-space: nowrap; }
+.keys h3 { grid-column: 1 / -1; margin: 8px 0 0; font-family: var(--f-display); font-weight: 800; font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--signal); }
+.opts { display: grid; gap: 10px; }
+.opt { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 16px; }
+.opt button { min-width: 120px; }
+.note { font-size: 14px; color: var(--mist); line-height: 1.45; }
+
+/* ------------------------------------------------ touch */
+#touch { position: fixed; inset: 0; pointer-events: none; }
+#joyzone { position: absolute; left: 0; top: 18%; bottom: 0; width: 50%; pointer-events: auto; touch-action: none; }
+#joybase { position: absolute; width: 128px; height: 128px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.35); background: rgba(8,16,20,0.25); opacity: 0.0; transition: opacity .2s; left: 40px; bottom: 60px; }
+#joybase.on { opacity: 1; }
+#joyknob { position: absolute; left: 40px; top: 40px; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.75); }
+#btnact { position: absolute; right: max(22px, var(--safe-r)); bottom: calc(40px + var(--safe-b)); width: 108px; height: 108px; border-radius: 50%; border: 0; background: var(--signal); color: #1a0d05; font-family: var(--f-display); font-weight: 900; font-size: 22px; letter-spacing: 0.06em; pointer-events: auto; touch-action: none; box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+.tbtn { position: absolute; pointer-events: auto; border-radius: 22px; border: 1px solid var(--line); background: var(--panel); padding: 8px 14px; font-size: 14px; font-weight: 600; }
+#btncam { right: max(22px, var(--safe-r)); bottom: calc(162px + var(--safe-b)); }
+#btnpause { right: max(22px, var(--safe-r)); top: calc(220px + var(--safe-t)); }
+
+@media (max-height: 640px) { #minimap { display: none; } }
+@media (max-height: 520px) { .ro:nth-child(4) { display: none; } #camtag { display: none; } }
+@media (max-width: 720px) {
+  #hud-bottom { bottom: calc(10px + var(--safe-b)); width: min(300px, 62vw); padding: 8px 12px; }
+  #minimap { display: none; }
+  #camtag { display: none; }
+  .mbtn { font-size: 24px; }
+  .mbtn.primary { font-size: 36px; }
+  .credit { font-size: 12px; max-width: 80vw; }
+}
+@media (prefers-reduced-motion: reduce) { .callout { animation-duration: 2.4s; } #prompt.blink { animation: none; } }
+</style>
+
+<canvas id="c" aria-label="Voo de wingsuit em 3D no Monte Emilius"></canvas>
+<div id="mist"></div>
+<div id="vignette"></div>
+<div id="flash"></div>
+<div class="scrim" id="scrim" hidden></div>
+
+<div id="loading">
+  <div class="wrap">
+    <div class="eyebrow">Monte Emilius · 3559 m · Valle d'Aosta</div>
+    <h1 class="title">EMILIUS<br><em>WINGSUIT</em></h1>
+    <div class="bar"><i id="loadbar"></i></div>
+    <div id="loadmsg">Preparando o salto…</div>
+    <div id="loaderr" hidden></div>
+  </div>
+</div>
+
+<div id="menu" hidden>
+  <div class="col">
+    <div class="eyebrow">Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E</div>
+    <h1 class="title">EMILIUS</h1>
+    <div class="sub">Salto BASE de wingsuit</div>
+    <div class="stats"><span>Saída <b class="num" id="st-exit">3556 m</b></span><span>Pouso <b class="num" id="st-lz">596 m</b></span><span>Desnível <b class="num" id="st-drop">2960 m</b></span><span><b class="num" id="ngates">10</b> portões</span></div>
+    <div class="menu-btns">
+      <button class="mbtn primary" id="bplay">Saltar <small>Espaço</small></button>
+      <button class="mbtn" id="bhelp">Controles <small>H</small></button>
+      <button class="mbtn" id="bsettings">Ajustes</button>
+    </div>
+    <div class="record" id="record"></div>
+  </div>
+  <div class="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.</div>
+</div>
+
+<div id="hud" hidden>
+  <div id="hud-left">
+    <canvas id="tape" width="116" height="520"></canvas>
+    <div class="hud-card readouts">
+      <div class="ro big" id="ro-agl"><div class="k">AGL</div><div class="v num"><span id="agl">0</span><small>m</small></div></div>
+      <div class="ro"><div class="k">Altitude</div><div class="v num"><span id="alt">0</span><small>m</small></div></div>
+      <div class="ro" id="ro-lz"><div class="k">Acima do pouso</div><div class="v num"><span id="alz">0</span><small>m</small></div></div>
+      <div class="ro"><div class="k">Planeio</div><div class="v num"><span id="glide">–</span></div></div>
+    </div>
+  </div>
+  <div id="hud-right" class="hud-card">
+    <div id="score" class="num">0</div>
+    <div id="mult">×1</div>
+    <div class="line2"><span>Portões</span><b id="gates" class="num">0/9</b></div>
+    <div class="line2"><span>Tempo</span><b id="time" class="num">0:00</b></div>
+  </div>
+  <div id="hud-bottom" class="hud-card">
+    <div class="speedrow">
+      <div><div id="spd" class="num">0</div><div class="unit">KM/H</div></div>
+      <div class="sidevals">
+        <span>Queda <b id="vs" class="num">0</b> km/h</span>
+        <span>Carga <b id="gl" class="num">1.0</b> g</span>
+      </div>
+    </div>
+    <div class="prox">
+      <div class="lbl"><span>Proximidade</span><span id="proxv" class="num">–</span></div>
+      <div class="proxbar"><i id="proxbar"></i><s style="left:50%"></s><s style="left:75%"></s><s style="left:90%"></s></div>
+    </div>
+  </div>
+  <div id="lzmark" aria-hidden="true"><div class="lzm-ring"></div><div class="lzm-arrow"></div><div class="lzm-lbl"><div class="lzm-top"><b>ALVO</b> <span id="lzm-d" class="num">–</span></div><div id="lzm-h" class="num"></div><div id="lzm-hint"></div></div></div>
+  <div id="hud-msg"></div>
+  <div id="prompt"></div>
+  <div id="minimap"><canvas id="mm0" width="300" height="480"></canvas><canvas id="mm1" width="300" height="480"></canvas></div>
+  <div id="camtag"></div>
+  <div id="replaytag" hidden>REPLAY <button id="bskip">Pular</button></div>
+</div>
+
+<div id="touch" hidden>
+  <div id="joyzone"><div id="joybase"><div id="joyknob"></div></div></div>
+  <button id="btnact">SALTAR</button>
+  <button id="btncam" class="tbtn">Câmera</button>
+  <button id="btnpause" class="tbtn">Pausa</button>
+</div>
+
+<div id="result" class="modal" hidden>
+  <div class="card">
+    <h2 id="rtitle">Pouso perfeito</h2>
+    <div class="why" id="rwhy"></div>
+    <div class="tbl" id="rtable"></div>
+    <div class="newrec" id="rnew" hidden>Novo recorde</div>
+    <div class="row">
+      <button class="btn primary" id="bagain">Voar de novo <kbd>R</kbd></button>
+      <button class="btn" id="breplay">Ver replay</button>
+      <button class="btn" id="bmenu">Menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="modal" hidden>
+  <div class="card">
+    <h2>Pausa</h2>
+    <div class="row">
+      <button class="btn primary" id="bresume">Continuar <kbd>P</kbd></button>
+      <button class="btn" id="brestart">Recomeçar <kbd>R</kbd></button>
+      <button class="btn" id="bpmenu">Menu</button>
+    </div>
+  </div>
+</div>
+
+<div id="help" class="modal" hidden>
+  <div class="card">
+    <h2>Controles</h2>
+    <div class="keys">
+      <h3>Wingsuit</h3>
+      <span><kbd>W</kbd> <kbd>↑</kbd></span><span>Mergulhar: nariz para baixo, ganha velocidade</span>
+      <span><kbd>S</kbd> <kbd>↓</kbd></span><span>Planar e fazer flare: troca velocidade por altura</span>
+      <span><kbd>A</kbd> <kbd>D</kbd></span><span>Inclinar e curvar</span>
+      <span><kbd>Espaço</kbd></span><span>Saltar · abrir o paraquedas</span>
+      <h3>Paraquedas</h3>
+      <span><kbd>A</kbd> <kbd>D</kbd></span><span>Freio esquerdo / direito para curvar</span>
+      <span><kbd>S</kbd> ou <kbd>Espaço</kbd></span><span>Flare com os dois freios, a 3–5 m do chão</span>
+      <span><kbd>W</kbd></span><span>Tirantes dianteiros: desce mais rápido</span>
+      <h3>Geral</h3>
+      <span><kbd>C</kbd></span><span>Trocar câmera</span>
+      <span><kbd>F</kbd> <kbd>M</kbd></span><span>Fumaça · som</span>
+      <span><kbd>P</kbd> <kbd>R</kbd></span><span>Pausa · recomeçar</span>
+    </div>
+    <p class="note">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
+    <p class="note">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
+    <div class="row"><button class="btn primary" id="bhelpclose">Fechar</button></div>
+  </div>
+</div>
+
+<div id="settings" class="modal" hidden>
+  <div class="card">
+    <h2>Ajustes</h2>
+    <div class="opts">
+      <div class="opt"><span>Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)</span><button class="btn" id="oa">Ligada</button></div>
+      <div class="opt"><span>Qualidade gráfica</span><button class="btn" id="oq">Média</button></div>
+      <div class="opt"><span>Som</span><button class="btn" id="os">Ligado</button></div>
+      <div class="opt"><span>Inverter arfagem (W puxa, S mergulha)</span><button class="btn" id="oi">Não</button></div>
+      <div class="opt"><span>Fumaça nos pés</span><button class="btn" id="of">Ligada</button></div>
+    </div>
+    <p class="note" id="perfnote"></p>
+    <div class="row"><button class="btn primary" id="bsetclose">Fechar</button></div>
+  </div>
+</div>
+<!--SCRIPT-->

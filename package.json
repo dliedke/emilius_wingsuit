@@ -1,0 +1,15 @@
+{
+  "name": "emilius-wingsuit",
+  "version": "1.0.0",
+  "description": "Wingsuit e BASE jump em 3D no navegador (Three.js), inspirado no voo do Monte Emilius.",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "build:local": "node build.js --local",
+    "serve": "node build.js --local && cd dist && python3 -m http.server 8765",
+    "preview:terrain": "node tools/terrain-preview.js"
+  },
+  "devDependencies": {
+    "three": "0.170.0"
+  }
+}
