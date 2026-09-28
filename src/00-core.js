@@ -40,7 +40,7 @@ const QUALITY_PRESETS = {
   alta: { pr: 2.0, lod: 1.45, trees: 1.0, treeDist: 5200, clouds: 1.0, name: 'Alta' },
 };
 const SETTINGS = Object.assign({
-  quality: IS_TOUCH ? 'baixa' : 'media',
+  quality: IS_TOUCH ? 'baixa' : 'alta',
   sound: true,
   invert: false,
   smoke: true,
