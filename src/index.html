@@ -188,6 +188,21 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 @media (max-height: 640px) { #minimap { display: none; } }
 @media (max-height: 520px) { .ro:nth-child(4) { display: none; } #camtag { display: none; } }
+/* short viewports (phones in landscape) — the width-based rules below don't catch these,
+   so shrink the bottom HUD card here or it eats a big chunk of the little vertical room */
+@media (max-height: 480px) {
+  #hud-bottom { bottom: calc(4px + var(--safe-b)); width: min(240px, 30vw); padding: 4px 10px 5px; gap: 3px; }
+  #spd { font-size: clamp(18px, 5.5vh, 30px); min-width: 2.2ch; }
+  .speedrow { gap: 8px; }
+  .sidevals { font-size: 10px; gap: 0; }
+  .prox .lbl { font-size: 8px; }
+  .proxbar { height: 5px; }
+  #hud-left .readouts { padding: 4px 8px; gap: 2px; }
+  .ro .v { font-size: clamp(11px, 2vh, 15px); }
+  .ro .k { font-size: 8px; }
+  #hud-right { padding: 4px 9px; gap: 2px; }
+  #score { font-size: clamp(16px, 3vh, 24px); }
+}
 @media (max-width: 720px) {
   #hud-bottom { bottom: calc(10px + var(--safe-b)); width: min(300px, 62vw); padding: 8px 12px; }
   #minimap { display: none; }

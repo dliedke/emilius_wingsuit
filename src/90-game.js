@@ -754,6 +754,15 @@ function updateGates(dt) {
 
 // ------------------------------------------------------------ screens
 function show(id, on) { $(id).hidden = !on; }
+// on phones/tablets, jump straight into fullscreen landscape so the HUD has room to breathe
+function goFullscreenLandscape() {
+  if (!IS_TOUCH) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  const lock = () => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} };
+  if (req) { try { const p = req.call(el); if (p && p.then) p.then(lock).catch(lock); else lock(); } catch (e) { lock(); } }
+  else lock();
+}
 function toMenu() {
   GAME.state = 'menu'; GAME.paused = false;
   show('menu', true); show('scrim', true); show('hud', false); show('result', false); show('pause', false); show('touch', false);
@@ -767,6 +776,7 @@ function toMenu() {
 }
 function startPlay() {
   initAudio();
+  goFullscreenLandscape();
   GAME.state = 'play'; GAME.paused = false;
   show('menu', false); show('scrim', false); show('hud', true); show('result', false); show('pause', false); show('help', false); show('settings', false);
   $('replaytag').hidden = true;
