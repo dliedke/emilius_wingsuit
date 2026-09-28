@@ -460,13 +460,13 @@ function addSlopeDetail(L) {
 
 async function buildWorld(progress) {
   const t0 = performance.now();
-  const { L0, L2 } = await generateHeights((p) => progress(p * 0.8, 'Esculpindo o maciço do Emilius'));
+  const { L0, L2 } = await generateHeights((p) => progress(p * 0.8, i18n('load.sculpt')));
   WORLD.L0 = L0; WORLD.L2 = L2;
-  progress(0.8, 'Detalhando a rocha'); await nextFrame();
+  progress(0.8, i18n('load.detail')); await nextFrame();
   addSlopeDetail(L0);
   blendEdgeToFar(L0, L2);
   const t1 = performance.now();
-  progress(0.82, 'Sombras e neve'); await nextFrame();
+  progress(0.82, i18n('load.shadowsnow')); await nextFrame();
   bakeLevel(L2, null, true);
   const L2H = L2.horizon;
   const outer = (x, z) => {
@@ -474,13 +474,13 @@ async function buildWorld(progress) {
     const i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, n = L2.nx;
     return (L2H[j * n + i] * (1 - u) + L2H[j * n + i + 1] * u) * (1 - v) + (L2H[(j + 1) * n + i] * (1 - u) + L2H[(j + 1) * n + i + 1] * u) * v;
   };
-  progress(0.88, 'Sombras e neve'); await nextFrame();
+  progress(0.88, i18n('load.shadowsnow')); await nextFrame();
   bakeLevel(L0, outer, false);
   L2.horizon = null; L0.horizon = null;
   chunkBounds(L0); chunkBounds(L2);
-  progress(0.95, 'Plantando a floresta'); await nextFrame();
+  progress(0.95, i18n('load.forest')); await nextFrame();
   WORLD.trees = placeTrees(L0);
   const t2 = performance.now();
   WORLD.genStats = { heights: Math.round(t1 - t0), bake: Math.round(t2 - t1), trees: WORLD.trees.count };
-  progress(1, 'Pronto');
+  progress(1, i18n('load.ready'));
 }

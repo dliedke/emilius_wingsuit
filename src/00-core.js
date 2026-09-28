@@ -16,7 +16,7 @@ function mulberry32(seed) {
   };
 }
 function wrapAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
-function fmt(n) { return Math.round(n).toLocaleString('pt-BR'); }
+function fmt(n) { return Math.round(n).toLocaleString(LANG === 'pt' ? 'pt-BR' : 'en-US'); }
 const $ = (id) => document.getElementById(id);
 function store(key, val) {
   try {
@@ -35,9 +35,9 @@ const SUN_DIR = new THREE.Vector3(Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.sin(
 
 const IS_TOUCH = (('ontouchstart' in window) || navigator.maxTouchPoints > 0) && Math.min(screen.width, screen.height) < 900;
 const QUALITY_PRESETS = {
-  baixa: { pr: 1.0, lod: 0.65, trees: 0.45, treeDist: 2600, clouds: 0.5, name: 'Baixa' },
-  media: { pr: 1.5, lod: 1.0, trees: 0.75, treeDist: 3800, clouds: 0.8, name: 'Média' },
-  alta: { pr: 2.0, lod: 1.45, trees: 1.0, treeDist: 5200, clouds: 1.0, name: 'Alta' },
+  baixa: { pr: 1.0, lod: 0.65, trees: 0.45, treeDist: 2600, clouds: 0.5 },
+  media: { pr: 1.5, lod: 1.0, trees: 0.75, treeDist: 3800, clouds: 0.8 },
+  alta: { pr: 2.0, lod: 1.45, trees: 1.0, treeDist: 5200, clouds: 1.0 },
 };
 const SETTINGS = Object.assign({
   quality: 'alta',

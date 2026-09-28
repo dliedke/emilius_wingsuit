@@ -261,7 +261,7 @@ function doJump() {
   SIM.vel.copy(f).multiplyScalar(6.2); SIM.vel.y = 2.0;
   SIM.inflate = 0;
   SFX.jump();
-  if (GAME.state === 'play') callout('Saída!', 'orange', true);
+  if (GAME.state === 'play') callout(i18n('callout.exit'), 'orange', true);
 }
 function action() {
   if (GAME.state !== 'play' || GAME.paused) return;
@@ -303,11 +303,11 @@ function gameplay(dt) {
         const pts = (g.notch ? 750 : 250) * GAME.mult;
         GAME.gatePts += pts; GAME.score += pts; GAME.gatesPassed++;
         SFX.gate(g.notch);
-        if (live) callout(g.notch ? `Fenda! +${pts}` : `Portão +${pts}`, 'lake', !g.notch);
+        if (live) callout(i18n(g.notch ? 'callout.notch' : 'callout.gate', { pts }), 'lake', !g.notch);
       } else if (r < g.r * 5) {
         g.state = 2; g.t = 0;
         for (let j = 0; j < i; j++) if (R.gates[j].state === 0) { R.gates[j].state = 2; R.gates[j].t = 0; }
-        if (live) callout('Portão perdido', '', true);
+        if (live) callout(i18n('callout.gatemissed'), '', true);
       }
     }
   }
@@ -327,15 +327,15 @@ function gameplay(dt) {
     if (s.phase === 'fly') {
       if (d < 30) {
         GAME.streakT += dt; GAME.farT = 0;
-        if (GAME.streakT > 3.2 && GAME.mult < 5) { GAME.mult++; GAME.streakT = 0; if (live) callout(`Multiplicador ×${GAME.mult}`, 'orange', true); }
+        if (GAME.streakT > 3.2 && GAME.mult < 5) { GAME.mult++; GAME.streakT = 0; if (live) callout(i18n('callout.multiplier', { mult: GAME.mult }), 'orange', true); }
       } else {
         GAME.farT += dt;
-        if (GAME.farT > 2.6) { if (GAME.mult > 1 && live) callout('Multiplicador perdido', '', true); GAME.mult = 1; GAME.streakT = 0; GAME.farT = 0; }
+        if (GAME.farT > 2.6) { if (GAME.mult > 1 && live) callout(i18n('callout.multiplierlost'), '', true); GAME.mult = 1; GAME.streakT = 0; GAME.farT = 0; }
       }
       const tier = d < 5 ? 3 : d < 10 ? 2 : d < 20 ? 1 : 0;
       for (let k = 1; k <= 3; k++) GAME.tierT[k] = Math.max(0, GAME.tierT[k] - dt);
       if (tier > 0 && tier > GAME.tier && GAME.tierT[tier] <= 0 && live) {
-        callout(['', 'Perto', 'Rasante', 'Insano'][tier], tier === 3 ? 'red' : tier === 2 ? 'orange' : '', tier === 1);
+        callout(['', i18n('tier.close'), i18n('tier.grazing'), i18n('tier.insane')][tier], tier === 3 ? 'red' : tier === 2 ? 'orange' : '', tier === 1);
         GAME.tierT[tier] = 3;
       }
       GAME.tier = tier;
@@ -343,7 +343,7 @@ function gameplay(dt) {
     // audible altimeter (height above the landing field)
     const alz = s.pos.y - TC.LZ.h;
     if (s.phase === 'fly' && nextGateIndex() === -1 || alz < 700) {
-      if (GAME.warn === 0 && alz < 640) { GAME.warn = 1; SFX.beepWarn(); if (live) callout('Altímetro 640 m', 'orange', true); }
+      if (GAME.warn === 0 && alz < 640) { GAME.warn = 1; SFX.beepWarn(); if (live) callout(i18n('callout.altimeter', { m: 640 }), 'orange', true); }
       if (alz < 420) { GAME.beepT -= dt; if (GAME.beepT <= 0) { SFX.beepNow(); GAME.beepT = 1.3; } GAME.warn = 2; }
     }
   }
@@ -353,27 +353,27 @@ function handleEvents() {
   const live = GAME.state === 'play';
   while (EVENTS.length) {
     const e = EVENTS.shift();
-    if (e.type === 'deploy') { SFX.deploy(); if (live) callout('Abrindo', '', true); }
+    if (e.type === 'deploy') { SFX.deploy(); if (live) callout(i18n('callout.opening'), '', true); }
     else if (e.type === 'scrape') {
       GAME.scrapes++;
       const pen = Math.min(GAME.score, 250);
       GAME.score -= pen; GAME.mult = 1; GAME.streakT = 0;
       noiseBurst(0.35, e.kind === 'tree' ? 1500 : 500, 0.5, 'bandpass', 0, 0.9);
       addTrauma(0.55);
-      if (live) callout(e.kind === 'tree' ? `Galhos! −${pen}` : `Raspou! −${pen}`, 'orange', true);
+      if (live) callout(i18n(e.kind === 'tree' ? 'callout.branches' : 'callout.scraped', { pen }), 'orange', true);
     }
-    else if (e.type === 'canopyOpen') { SFX.open(); addTrauma(clamp(SIM.openShock / 5, 0.2, 0.8)); if (live) callout('Paraquedas aberto', 'lake', true); }
+    else if (e.type === 'canopyOpen') { SFX.open(); addTrauma(clamp(SIM.openShock / 5, 0.2, 0.8)); if (live) callout(i18n('callout.canopyopen'), 'lake', true); }
     else if (e.type === 'land') {
       SFX.land(e.kind);
       if (e.kind === 'water') SFX.splash();
       addTrauma(e.kind === 'hard' ? 0.7 : 0.25);
-      if (live) callout({ perfect: 'Pouso perfeito', good: 'Bom pouso', plf: 'Rolamento', hard: 'Pouso duro', water: 'Na água', tree: 'Na árvore' }[e.kind], e.kind === 'perfect' ? 'lake' : e.kind === 'good' ? '' : 'orange');
+      if (live) callout(i18n('land.' + e.kind),e.kind === 'perfect' ? 'lake' : e.kind === 'good' ? '' : 'orange');
       GAME.endT = 0;
     } else if (e.type === 'crash') {
       if (e.cause === 'water') SFX.splash(); else SFX.crash();
       addTrauma(1);
       const fl = $('flash'); fl.style.transition = 'none'; fl.style.opacity = 0.85; requestAnimationFrame(() => { fl.style.transition = 'opacity 0.9s'; fl.style.opacity = 0; });
-      if (live) callout('Impacto', 'red');
+      if (live) callout(i18n('callout.impact'), 'red');
       GAME.endT = 0;
     }
   }
@@ -391,36 +391,40 @@ function computeScore() {
   const total = s.outcome === 'crash' ? b.prox + b.gates : b.prox + b.gates + b.speed + b.landing + b.accuracy;
   return { b, total, ok };
 }
-function showResults() {
-  if (GAME.state !== 'play') return;
-  GAME.state = 'result';
-  const { b, total, ok } = computeScore();
+function renderResults() {
+  const { b, total } = computeScore();
   const s = SIM;
   const T = $('rtitle'), why = $('rwhy');
   T.className = '';
   const kmh = Math.round((s.crashSpeed || 0) * 3.6);
   if (s.outcome === 'crash') {
-    T.textContent = { terrain: 'Impacto', tree: 'Árvore', water: 'Impacto na água' }[s.crashCause] || 'Impacto';
+    T.textContent = { terrain: i18n('callout.impact'), tree: i18n('result.title.tree'), water: i18n('result.title.water') }[s.crashCause] || i18n('callout.impact');
     T.className = 'bad';
-    why.textContent = s.crashCause === 'tree' ? `Você acertou uma copa a ${kmh} km/h.` : s.crashCause === 'water' ? `Entrada na água a ${kmh} km/h.` : `Contato com o relevo a ${kmh} km/h. Abra mais alto ou suba com S antes da crista.`;
+    why.textContent = i18n(s.crashCause === 'tree' ? 'result.why.tree' : s.crashCause === 'water' ? 'result.why.water' : 'result.why.terrain', { kmh });
   } else {
     const L = s.landing;
-    T.textContent = { perfect: 'Pouso perfeito', good: 'Bom pouso', plf: 'Pouso com rolamento', hard: 'Pouso duro', water: 'Pouso na água', tree: 'Preso na árvore' }[L.kind];
+    T.textContent = { perfect: i18n('land.perfect'), good: i18n('land.good'), plf: i18n('result.title.plf'), hard: i18n('land.hard'), water: i18n('result.title.waterland'), tree: i18n('result.title.treeland') }[L.kind];
     T.className = L.kind === 'perfect' || L.kind === 'good' ? 'good' : 'bad';
-    why.textContent = `Toque a ${L.vs.toFixed(1)} m/s de descida, ${Math.round(L.dist)} m do centro do alvo.`;
+    why.textContent = i18n('result.why.landing', { vs: L.vs.toFixed(1), dist: Math.round(L.dist) });
   }
   const mm = Math.floor(GAME.flightT / 60), ss = Math.floor(GAME.flightT % 60).toString().padStart(2, '0');
   const rows = [
-    ['Tempo de wingsuit', `${mm}:${ss}`],
-    ['Distância voada', `${(GAME.dist / 1000).toFixed(2)} km`],
-    ['Velocidade máxima', `${Math.round(GAME.maxSpeed * 3.6)} km/h`],
-    ['Proximidade', fmt(b.prox)],
-    [`Portões ${GAME.gatesPassed}/${R.gates.length}`, fmt(b.gates)],
+    [i18n('result.row.time'), `${mm}:${ss}`],
+    [i18n('result.row.distance'), `${(GAME.dist / 1000).toFixed(2)} km`],
+    [i18n('result.row.maxspeed'), `${Math.round(GAME.maxSpeed * 3.6)} km/h`],
+    [i18n('hud.proximity'), fmt(b.prox)],
+    [i18n('result.row.gates', { passed: GAME.gatesPassed, total: R.gates.length }), fmt(b.gates)],
   ];
-  if (GAME.scrapes) rows.push(['Raspadas no relevo', String(GAME.scrapes)]);
-  if (s.outcome !== 'crash') rows.push(['Bônus de velocidade', fmt(b.speed)], ['Pouso', fmt(b.landing)], ['Precisão no alvo', fmt(b.accuracy)]);
-  rows.push(['Total', fmt(total)]);
+  if (GAME.scrapes) rows.push([i18n('result.row.scrapes'), String(GAME.scrapes)]);
+  if (s.outcome !== 'crash') rows.push([i18n('result.row.speedbonus'), fmt(b.speed)], [i18n('result.row.landing'), fmt(b.landing)], [i18n('result.row.accuracy'), fmt(b.accuracy)]);
+  rows.push([i18n('result.row.total'), fmt(total)]);
   $('rtable').innerHTML = rows.map(([k, v], i) => i === rows.length - 1 ? `<span class="tot">${k}</span><span class="tot">${v}</span>` : `<span>${k}</span><span>${v}</span>`).join('');
+}
+function showResults() {
+  if (GAME.state !== 'play') return;
+  GAME.state = 'result';
+  const { total, ok } = computeScore();
+  renderResults();
   const newRec = ok && total > GAME.best;
   if (newRec) { GAME.best = total; store('best', total); }
   $('rnew').hidden = !newRec;
@@ -616,20 +620,20 @@ function updateHud(dt) {
   // prompts
   const P = $('prompt');
   let txt = '', blink = false, top = false;
-  if (s.phase === 'ready') txt = IS_TOUCH ? 'Toque em SALTAR<br><small>depois arraste para baixo para planar</small>' : '<kbd>ESPAÇO</kbd> para saltar<br><small><kbd>S</kbd> ou <kbd>↓</kbd> levanta o nariz · <kbd>W</kbd> ou <kbd>↑</kbd> mergulha · <kbd>A</kbd> <kbd>D</kbd> curva</small>';
-  else if ((s.phase === 'fly' || s.phase === 'exit') && s.warn > 0.35) { txt = 'Suba!'; blink = true; }
-  else if ((s.phase === 'exit' || s.phase === 'fly') && s.airT < 7) txt = IS_TOUCH ? '<small>arraste para baixo = levantar o nariz · para cima = mergulhar</small>' : '<small><kbd>S</kbd>/<kbd>↓</kbd> levanta o nariz · <kbd>W</kbd>/<kbd>↑</kbd> mergulha</small>';
-  else if (s.phase === 'fly' && alz < 420 && alz > 0) { txt = IS_TOUCH ? 'Abra o paraquedas' : 'Abra o paraquedas · <kbd>ESPAÇO</kbd>'; blink = true; }
+  if (s.phase === 'ready') txt = i18n(IS_TOUCH ? 'prompt.readyTouch' : 'prompt.readyKey');
+  else if ((s.phase === 'fly' || s.phase === 'exit') && s.warn > 0.35) { txt = i18n('prompt.climb'); blink = true; }
+  else if ((s.phase === 'exit' || s.phase === 'fly') && s.airT < 7) txt = i18n(IS_TOUCH ? 'prompt.earlyTouch' : 'prompt.earlyKey');
+  else if (s.phase === 'fly' && alz < 420 && alz > 0) { txt = i18n(IS_TOUCH ? 'prompt.deployTouch' : 'prompt.deployKey'); blink = true; }
   else if (s.phase === 'canopy') {
     const feet = s.pos.y - 1.02 - ground;
-    if (feet < 9 && feet > 1) { txt = IS_TOUCH ? 'Flare!' : 'Flare! <kbd>S</kbd>'; blink = true; }
-    else if (s.phaseT < 6) { top = true; txt = IS_TOUCH ? '<small>Arraste para curvar · puxe para baixo no flare<br>Siga o marcador laranja até o alvo</small>' : '<small><kbd>A</kbd> <kbd>D</kbd> curvar · <kbd>S</kbd> flare perto do chão<br>Siga o marcador laranja até o alvo</small>'; }
-  } else if ((s.phase === 'landed' || s.phase === 'crashed') && GAME.endT > 1.2) txt = IS_TOUCH ? '' : '<kbd>ESPAÇO</kbd> resultado';
+    if (feet < 9 && feet > 1) { txt = i18n(IS_TOUCH ? 'prompt.flareTouch' : 'prompt.flareKey'); blink = true; }
+    else if (s.phaseT < 6) { top = true; txt = i18n(IS_TOUCH ? 'prompt.canopyTouch' : 'prompt.canopyKey'); }
+  } else if ((s.phase === 'landed' || s.phase === 'crashed') && GAME.endT > 1.2) txt = IS_TOUCH ? '' : i18n('prompt.resultKey');
   if (P.innerHTML !== txt) P.innerHTML = txt;
   P.classList.toggle('blink', blink);
   P.classList.toggle('top', top);
-  $('camtag').innerHTML = `Câmera <b>${CAM.names[CAM.mode]}</b> · C<br>Fumaça ${SETTINGS.smoke ? 'ligada' : 'desligada'} · F`;
-  $('btnact').textContent = s.phase === 'ready' ? 'SALTAR' : s.phase === 'fly' ? 'ABRIR' : s.phase === 'canopy' ? 'FLARE' : 'OK';
+  $('camtag').innerHTML = `${i18n('hud.camera')} <b>${i18n(CAM.nameKeys[CAM.mode])}</b> · C<br>${i18n('hud.smoke')} ${i18n(SETTINGS.smoke ? 'state.on' : 'state.off')} · F`;
+  $('btnact').textContent = i18n(s.phase === 'ready' ? 'btn.jump' : s.phase === 'fly' ? 'btn.open' : s.phase === 'canopy' ? 'btn.flare' : 'btn.ok');
   drawMinimapDyn();
 }
 
@@ -651,7 +655,7 @@ function predictTouchdown(s) {
 }
 function setText(id, v) { if (AID.txt[id] !== v) { AID.txt[id] = v; $(id).textContent = v; } }
 function fmtDist(d) {
-  if (d >= 1000) return (d / 1000).toFixed(1).replace('.', ',') + ' km';
+  if (d >= 1000) { const km = (d / 1000).toFixed(1); return (LANG === 'pt' ? km.replace('.', ',') : km) + ' km'; }
   return (d >= 100 ? Math.round(d / 10) * 10 : Math.round(d)) + ' m';
 }
 function updateLandingAids(dt, cam) {
@@ -709,7 +713,7 @@ function updateLandingAids(dt, cam) {
     // once the target is big on screen the marker steps back so it doesn't cover it
     if (ringD > 130 || (s.phase === 'canopy' && dH < 55 && feet < 45)) cls += ' dim';
     setText('lzm-d', fmtDist(dH));
-    setText('lzm-h', alz > 3 ? `${Math.round(alz)} m acima` : '');
+    setText('lzm-h', alz > 3 ? i18n('aid.above', { m: Math.round(alz) }) : '');
     // glide hint under canopy (updated twice a second so it doesn't flicker)
     AID.hintT -= dt;
     if (AID.hintT <= 0) {
@@ -719,10 +723,10 @@ function updateLandingAids(dt, cam) {
         const alt = Math.max(0, s.pos.y - 1.02 - R.lzY);
         const ux = (LZ.x - s.pos.x) / Math.max(1, dH), uz = (LZ.z - s.pos.z) / Math.max(1, dH);
         const reach = alt / 4.8 * (11.2 + WIND.x * ux + WIND.z * uz);   // straight at it, full glide
-        if (predErr < TARGET_R * 1.3) { hint = 'Na linha do alvo ✓'; hc = 'good'; }
-        else if (reach < dH * 0.9) { hint = 'Não alcança: vá reto, sem freio'; hc = 'bad'; }
-        else if (reach > dH + 220 && alt > 70) { hint = 'Alto demais: gaste altura com curvas'; hc = 'warn'; }
-        else { hint = 'Aponte para o alvo'; hc = ''; }
+        if (predErr < TARGET_R * 1.3) { hint = i18n('aid.online'); hc = 'good'; }
+        else if (reach < dH * 0.9) { hint = i18n('aid.short'); hc = 'bad'; }
+        else if (reach > dH + 220 && alt > 70) { hint = i18n('aid.high'); hc = 'warn'; }
+        else { hint = i18n('aid.aim'); hc = ''; }
       }
       AID.hint = hint; AID.hintCls = hc;
       setText('lzm-hint', hint);
@@ -763,13 +767,16 @@ function goFullscreenLandscape() {
   if (req) { try { const p = req.call(el); if (p && p.then) p.then(lock).catch(lock); else lock(); } catch (e) { lock(); } }
   else lock();
 }
+function updateMenuRecord() {
+  $('record').textContent = GAME.best ? i18n('menu.record', { n: fmt(GAME.best) }) : i18n('menu.norecord');
+  $('ngates').textContent = String(TC.GATES.length);
+}
 function toMenu() {
   GAME.state = 'menu'; GAME.paused = false;
   show('menu', true); show('scrim', true); show('hud', false); show('result', false); show('pause', false); show('touch', false);
   $('replaytag').hidden = true;
-  $('record').textContent = GAME.best ? `Recorde neste aparelho: ${fmt(GAME.best)} pontos` : 'Sem recorde ainda neste aparelho.';
-  $('ngates').textContent = String(TC.GATES.length);
-  const ex = Math.round(R.exitY), lz = Math.round(groundHeight(TC.LZ.x, TC.LZ.z));
+  updateMenuRecord();
+  const ex =Math.round(R.exitY), lz = Math.round(groundHeight(TC.LZ.x, TC.LZ.z));
   $('st-exit').textContent = ex + ' m'; $('st-lz').textContent = lz + ' m'; $('st-drop').textContent = (ex - lz) + ' m';
   resetRun();
   GAME.attractT = 0;
@@ -794,13 +801,14 @@ function togglePause(force) {
 function cycleCam() { CAM.mode = (CAM.mode + 1) % 4; CAM.shot = null; SETTINGS.cam = CAM.mode; saveSettings(); SFX.click(); }
 function toggleHelp(on) { const h = $('help'); h.hidden = on !== undefined ? !on : !h.hidden; if (!h.hidden) { if (GAME.state === 'play') togglePause(true); setTimeout(() => $('bhelpclose').focus(), 30); } }
 function refreshSettings() {
-  $('oq').textContent = QUALITY_PRESETS[SETTINGS.quality].name;
-  $('os').textContent = SETTINGS.sound ? 'Ligado' : 'Desligado';
-  $('oi').textContent = SETTINGS.invert ? 'Sim' : 'Não';
-  $('of').textContent = SETTINGS.smoke ? 'Ligada' : 'Desligada';
-  $('oa').textContent = SETTINGS.assist ? 'Ligada' : 'Desligada';
+  $('olang').textContent = LANG === 'pt' ? 'Português' : 'English';
+  $('oq').textContent = i18n('quality.' + SETTINGS.quality);
+  $('os').textContent = i18n(SETTINGS.sound ? 'state.on' : 'state.off');
+  $('oi').textContent = i18n(SETTINGS.invert ? 'state.yes' : 'state.no');
+  $('of').textContent = i18n(SETTINGS.smoke ? 'state.on' : 'state.off');
+  $('oa').textContent = i18n(SETTINGS.assist ? 'state.on' : 'state.off');
   const st = WORLD.genStats || {};
-  $('perfnote').textContent = `Relevo com resolução de ${CELL0} m (${fmt(WORLD.L0.nx * WORLD.L0.nz)} amostras), gerado em ${((st.heights || 0) / 1000).toFixed(1)} s; ${fmt(st.trees || 0)} árvores.`;
+  $('perfnote').textContent = i18n('set.perfnote', { cell: CELL0, samples: fmt(WORLD.L0.nx * WORLD.L0.nz), time: ((st.heights || 0) / 1000).toFixed(1), trees: fmt(st.trees || 0) });
 }
 function applyQuality() {
   const Q = QUALITY_PRESETS[SETTINGS.quality];
@@ -816,6 +824,7 @@ function wireUi() {
   click('bhelpclose', () => toggleHelp(false));
   click('bsettings', () => { refreshSettings(); show('settings', true); setTimeout(() => $('bsetclose').focus(), 30); });
   click('bsetclose', () => show('settings', false));
+  click('olang', () => setLang(LANG === 'pt' ? 'en' : 'pt'));
   click('oq', () => { const k = Object.keys(QUALITY_PRESETS); SETTINGS.quality = k[(k.indexOf(SETTINGS.quality) + 1) % k.length]; saveSettings(); applyQuality(); refreshSettings(); });
   click('os', () => { setMute(SETTINGS.sound); refreshSettings(); });
   click('oi', () => { SETTINGS.invert = !SETTINGS.invert; saveSettings(); refreshSettings(); });
@@ -980,6 +989,7 @@ function simulateFixed(sec, pitch, roll) {
 // ------------------------------------------------------------ boot
 async function boot() {
   const bar = $('loadbar'), msg = $('loadmsg');
+  applyI18n();
   const progress = (p, text) => { bar.style.width = `${Math.round(p * 100)}%`; if (text) msg.textContent = text; };
   try {
     const test = document.createElement('canvas').getContext('webgl2');
@@ -988,7 +998,7 @@ async function boot() {
     applyQuality();
     CAM.mode = SETTINGS.cam || 0;
     await buildWorld(progress);
-    msg.textContent = 'Montando a cena';
+    msg.textContent = i18n('load.scene');
     await nextFrame();
     buildSky();
     R.terrain.push(new TerrainLevel(WORLD.L2, true));
@@ -1028,8 +1038,8 @@ async function boot() {
     const e = $('loaderr');
     e.hidden = false;
     e.textContent = err && err.message === 'webgl2'
-      ? 'Este navegador não liberou WebGL 2. Tente o Chrome, Edge, Firefox ou Safari atualizados, com aceleração de hardware ativada.'
-      : 'Não foi possível montar o mundo 3D: ' + (err && err.message ? err.message : err);
+      ? i18n('error.webgl2')
+      : i18n('error.worldbuild') + (err && err.message ? err.message : err);
     msg.textContent = '';
   }
 }

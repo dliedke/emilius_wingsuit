@@ -1,6 +1,6 @@
 // ================================================================ CAMERA
 const CAM = {
-  mode: 0, names: ['Perseguição', 'Capacete', 'Drone lateral', 'Cinema'],
+  mode: 0, nameKeys: ['cam.chase', 'cam.helmet', 'cam.drone', 'cam.cinema'],
   dir: new THREE.Vector3(0, 0, -1), upS: new THREE.Vector3(0, 1, 0),
   pos: new THREE.Vector3(), look: new THREE.Vector3(),
   fov: 70, trauma: 0, t: 0,

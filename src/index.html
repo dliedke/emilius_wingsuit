@@ -222,72 +222,72 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="loading">
   <div class="wrap">
-    <div class="eyebrow">Monte Emilius · 3559 m · Valle d'Aosta</div>
+    <div class="eyebrow" data-i18n="eyebrow.loading">Monte Emilius · 3559 m · Valle d'Aosta</div>
     <h1 class="title">EMILIUS<br><em>WINGSUIT</em></h1>
     <div class="bar"><i id="loadbar"></i></div>
-    <div id="loadmsg">Preparando o salto…</div>
+    <div id="loadmsg" data-i18n="load.prepare">Preparando o salto…</div>
     <div id="loaderr" hidden></div>
   </div>
 </div>
 
 <div id="menu" hidden>
   <div class="col">
-    <div class="eyebrow">Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E</div>
+    <div class="eyebrow" data-i18n="eyebrow.menu">Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E</div>
     <h1 class="title">EMILIUS</h1>
-    <div class="sub">Salto BASE de wingsuit</div>
-    <div class="stats"><span>Saída <b class="num" id="st-exit">3556 m</b></span><span>Pouso <b class="num" id="st-lz">596 m</b></span><span>Desnível <b class="num" id="st-drop">2960 m</b></span><span><b class="num" id="ngates">10</b> portões</span></div>
+    <div class="sub" data-i18n="menu.subtitle">Salto BASE de wingsuit</div>
+    <div class="stats"><span><span data-i18n="stat.exit">Saída</span> <b class="num" id="st-exit">3556 m</b></span><span><span data-i18n="stat.lz">Pouso</span> <b class="num" id="st-lz">596 m</b></span><span><span data-i18n="stat.drop">Desnível</span> <b class="num" id="st-drop">2960 m</b></span><span><b class="num" id="ngates">10</b> <span data-i18n="stat.gates">portões</span></span></div>
     <div class="menu-btns">
-      <button class="mbtn primary" id="bplay">Saltar <small>Espaço</small></button>
-      <button class="mbtn" id="bhelp">Controles <small>H</small></button>
-      <button class="mbtn" id="bsettings">Ajustes</button>
+      <button class="mbtn primary" id="bplay"><span data-i18n="menu.play">Saltar</span> <small data-i18n="key.space">Espaço</small></button>
+      <button class="mbtn" id="bhelp"><span data-i18n="menu.controls">Controles</span> <small>H</small></button>
+      <button class="mbtn" id="bsettings" data-i18n="menu.settings">Ajustes</button>
     </div>
     <div class="record" id="record"></div>
   </div>
-  <div class="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.</div>
+  <div class="credit" data-i18n-html="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.</div>
 </div>
 
 <div id="hud" hidden>
   <div id="hud-left">
     <canvas id="tape" width="116" height="520"></canvas>
     <div class="hud-card readouts">
-      <div class="ro big" id="ro-agl"><div class="k">AGL</div><div class="v num"><span id="agl">0</span><small>m</small></div></div>
-      <div class="ro"><div class="k">Altitude</div><div class="v num"><span id="alt">0</span><small>m</small></div></div>
-      <div class="ro" id="ro-lz"><div class="k">Acima do pouso</div><div class="v num"><span id="alz">0</span><small>m</small></div></div>
-      <div class="ro"><div class="k">Planeio</div><div class="v num"><span id="glide">–</span></div></div>
+      <div class="ro big" id="ro-agl"><div class="k" data-i18n="hud.agl">AGL</div><div class="v num"><span id="agl">0</span><small>m</small></div></div>
+      <div class="ro"><div class="k" data-i18n="hud.altitude">Altitude</div><div class="v num"><span id="alt">0</span><small>m</small></div></div>
+      <div class="ro" id="ro-lz"><div class="k" data-i18n="hud.abovelz">Acima do pouso</div><div class="v num"><span id="alz">0</span><small>m</small></div></div>
+      <div class="ro"><div class="k" data-i18n="hud.glide">Planeio</div><div class="v num"><span id="glide">–</span></div></div>
     </div>
   </div>
   <div id="hud-right" class="hud-card">
     <div id="score" class="num">0</div>
     <div id="mult">×1</div>
-    <div class="line2"><span>Portões</span><b id="gates" class="num">0/9</b></div>
-    <div class="line2"><span>Tempo</span><b id="time" class="num">0:00</b></div>
+    <div class="line2"><span data-i18n="hud.gates">Portões</span><b id="gates" class="num">0/9</b></div>
+    <div class="line2"><span data-i18n="hud.time">Tempo</span><b id="time" class="num">0:00</b></div>
   </div>
   <div id="hud-bottom" class="hud-card">
     <div class="speedrow">
       <div><div id="spd" class="num">0</div><div class="unit">KM/H</div></div>
       <div class="sidevals">
-        <span>Queda <b id="vs" class="num">0</b> km/h</span>
-        <span>Carga <b id="gl" class="num">1.0</b> g</span>
+        <span><span data-i18n="hud.descent">Queda</span> <b id="vs" class="num">0</b> km/h</span>
+        <span><span data-i18n="hud.load">Carga</span> <b id="gl" class="num">1.0</b> g</span>
       </div>
     </div>
     <div class="prox">
-      <div class="lbl"><span>Proximidade</span><span id="proxv" class="num">–</span></div>
+      <div class="lbl"><span data-i18n="hud.proximity">Proximidade</span><span id="proxv" class="num">–</span></div>
       <div class="proxbar"><i id="proxbar"></i><s style="left:50%"></s><s style="left:75%"></s><s style="left:90%"></s></div>
     </div>
   </div>
-  <div id="lzmark" aria-hidden="true"><div class="lzm-ring"></div><div class="lzm-arrow"></div><div class="lzm-lbl"><div class="lzm-top"><b>ALVO</b> <span id="lzm-d" class="num">–</span></div><div id="lzm-h" class="num"></div><div id="lzm-hint"></div></div></div>
+  <div id="lzmark" aria-hidden="true"><div class="lzm-ring"></div><div class="lzm-arrow"></div><div class="lzm-lbl"><div class="lzm-top"><b data-i18n="hud.target">ALVO</b> <span id="lzm-d" class="num">–</span></div><div id="lzm-h" class="num"></div><div id="lzm-hint"></div></div></div>
   <div id="hud-msg"></div>
   <div id="prompt"></div>
   <div id="minimap"><canvas id="mm0" width="300" height="480"></canvas><canvas id="mm1" width="300" height="480"></canvas></div>
   <div id="camtag"></div>
-  <div id="replaytag" hidden>REPLAY <button id="bskip">Pular</button></div>
+  <div id="replaytag" hidden><span data-i18n="replay.label">REPLAY</span> <button id="bskip" data-i18n="replay.skip">Pular</button></div>
 </div>
 
 <div id="touch" hidden>
   <div id="joyzone"><div id="joybase"><div id="joyknob"></div></div></div>
   <button id="btnact">SALTAR</button>
-  <button id="btncam" class="tbtn">Câmera</button>
-  <button id="btnpause" class="tbtn">Pausa</button>
+  <button id="btncam" class="tbtn" data-i18n="touch.camera">Câmera</button>
+  <button id="btnpause" class="tbtn" data-i18n="touch.pause">Pausa</button>
 </div>
 
 <div id="result" class="modal" hidden>
@@ -295,10 +295,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     <h2 id="rtitle">Pouso perfeito</h2>
     <div class="why" id="rwhy"></div>
     <div class="tbl" id="rtable"></div>
-    <div class="newrec" id="rnew" hidden>Novo recorde</div>
+    <div class="newrec" id="rnew" data-i18n="result.newrecord" hidden>Novo recorde</div>
     <div class="row">
-      <button class="btn primary" id="bagain">Voar de novo <kbd>R</kbd></button>
-      <button class="btn" id="breplay">Ver replay</button>
+      <button class="btn primary" id="bagain"><span data-i18n="result.again">Voar de novo</span> <kbd>R</kbd></button>
+      <button class="btn" id="breplay" data-i18n="result.replay">Ver replay</button>
       <button class="btn" id="bmenu">Menu</button>
     </div>
   </div>
@@ -306,10 +306,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="pause" class="modal" hidden>
   <div class="card">
-    <h2>Pausa</h2>
+    <h2 data-i18n="pause.title">Pausa</h2>
     <div class="row">
-      <button class="btn primary" id="bresume">Continuar <kbd>P</kbd></button>
-      <button class="btn" id="brestart">Recomeçar <kbd>R</kbd></button>
+      <button class="btn primary" id="bresume"><span data-i18n="pause.resume">Continuar</span> <kbd>P</kbd></button>
+      <button class="btn" id="brestart"><span data-i18n="pause.restart">Recomeçar</span> <kbd>R</kbd></button>
       <button class="btn" id="bpmenu">Menu</button>
     </div>
   </div>
@@ -317,40 +317,41 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="help" class="modal" hidden>
   <div class="card">
-    <h2>Controles</h2>
+    <h2 data-i18n="menu.controls">Controles</h2>
     <div class="keys">
       <h3>Wingsuit</h3>
-      <span><kbd>W</kbd> <kbd>↑</kbd></span><span>Mergulhar: nariz para baixo, ganha velocidade</span>
-      <span><kbd>S</kbd> <kbd>↓</kbd></span><span>Planar e fazer flare: troca velocidade por altura</span>
-      <span><kbd>A</kbd> <kbd>D</kbd></span><span>Inclinar e curvar</span>
-      <span><kbd>Espaço</kbd></span><span>Saltar · abrir o paraquedas</span>
-      <h3>Paraquedas</h3>
-      <span><kbd>A</kbd> <kbd>D</kbd></span><span>Freio esquerdo / direito para curvar</span>
-      <span><kbd>S</kbd> ou <kbd>Espaço</kbd></span><span>Flare com os dois freios, a 3–5 m do chão</span>
-      <span><kbd>W</kbd></span><span>Tirantes dianteiros: desce mais rápido</span>
-      <h3>Geral</h3>
-      <span><kbd>C</kbd></span><span>Trocar câmera</span>
-      <span><kbd>F</kbd> <kbd>M</kbd></span><span>Fumaça · som</span>
-      <span><kbd>P</kbd> <kbd>R</kbd></span><span>Pausa · recomeçar</span>
+      <span><kbd>W</kbd> <kbd>↑</kbd></span><span data-i18n="help.dive">Mergulhar: nariz para baixo, ganha velocidade</span>
+      <span><kbd>S</kbd> <kbd>↓</kbd></span><span data-i18n="help.glideflare">Planar e fazer flare: troca velocidade por altura</span>
+      <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.turn">Inclinar e curvar</span>
+      <span><kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.jumpopen">Saltar · abrir o paraquedas</span>
+      <h3 data-i18n="help.section.parachute">Paraquedas</h3>
+      <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.brakes">Freio esquerdo / direito para curvar</span>
+      <span><kbd>S</kbd> <span data-i18n="help.or">ou</span> <kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.flare">Flare com os dois freios, a 3–5 m do chão</span>
+      <span><kbd>W</kbd></span><span data-i18n="help.frontrisers">Tirantes dianteiros: desce mais rápido</span>
+      <h3 data-i18n="help.section.general">Geral</h3>
+      <span><kbd>C</kbd></span><span data-i18n="help.camera">Trocar câmera</span>
+      <span><kbd>F</kbd> <kbd>M</kbd></span><span data-i18n="help.smokesound">Fumaça · som</span>
+      <span><kbd>P</kbd> <kbd>R</kbd></span><span data-i18n="help.pauserestart">Pausa · recomeçar</span>
     </div>
-    <p class="note">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
-    <p class="note">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
-    <div class="row"><button class="btn primary" id="bhelpclose">Fechar</button></div>
+    <p class="note" data-i18n="help.note1">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
+    <p class="note" data-i18n="help.note2">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
+    <div class="row"><button class="btn primary" id="bhelpclose" data-i18n="action.close">Fechar</button></div>
   </div>
 </div>
 
 <div id="settings" class="modal" hidden>
   <div class="card">
-    <h2>Ajustes</h2>
+    <h2 data-i18n="menu.settings">Ajustes</h2>
     <div class="opts">
-      <div class="opt"><span>Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)</span><button class="btn" id="oa">Ligada</button></div>
-      <div class="opt"><span>Qualidade gráfica</span><button class="btn" id="oq">Média</button></div>
-      <div class="opt"><span>Som</span><button class="btn" id="os">Ligado</button></div>
-      <div class="opt"><span>Inverter arfagem (W puxa, S mergulha)</span><button class="btn" id="oi">Não</button></div>
-      <div class="opt"><span>Fumaça nos pés</span><button class="btn" id="of">Ligada</button></div>
+      <div class="opt"><span data-i18n="set.language">Idioma</span><button class="btn" id="olang">Português</button></div>
+      <div class="opt"><span data-i18n="set.assist">Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)</span><button class="btn" id="oa">Ligada</button></div>
+      <div class="opt"><span data-i18n="set.quality">Qualidade gráfica</span><button class="btn" id="oq">Média</button></div>
+      <div class="opt"><span data-i18n="set.sound">Som</span><button class="btn" id="os">Ligado</button></div>
+      <div class="opt"><span data-i18n="set.invert">Inverter arfagem (W puxa, S mergulha)</span><button class="btn" id="oi">Não</button></div>
+      <div class="opt"><span data-i18n="set.smoke">Fumaça nos pés</span><button class="btn" id="of">Ligada</button></div>
     </div>
     <p class="note" id="perfnote"></p>
-    <div class="row"><button class="btn primary" id="bsetclose">Fechar</button></div>
+    <div class="row"><button class="btn primary" id="bsetclose" data-i18n="action.close">Fechar</button></div>
   </div>
 </div>
 <!--SCRIPT-->

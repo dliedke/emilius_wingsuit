@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwYTE0MTgiLz4KICA8cGF0aCBkPSJNNCA1MCBMMjIgMTYgTDMwIDI5IEw0MSA5IEw2MCA1MCBaIiBmaWxsPSIjZmY2YjFhIi8+CiAgPHBhdGggZD0iTTQxIDkgTDQ4IDIyIEw2MCA1MCBMNDcgNTAgWiIgZmlsbD0iI2VlZjNmMSIvPgogIDxwYXRoIGQ9Ik04IDIyIEwyNiAyNyBMMTEgMzMgTDE1IDI3LjUgWiIgZmlsbD0iIzNmZDBjNCIvPgo8L3N2Zz4K">
 <meta name="description" content="Wingsuit e BASE jump em 3D no navegador, inspirado no voo do Monte Emilius.">
 </head>
 <body>
@@ -230,72 +231,72 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="loading">
   <div class="wrap">
-    <div class="eyebrow">Monte Emilius · 3559 m · Valle d'Aosta</div>
+    <div class="eyebrow" data-i18n="eyebrow.loading">Monte Emilius · 3559 m · Valle d'Aosta</div>
     <h1 class="title">EMILIUS<br><em>WINGSUIT</em></h1>
     <div class="bar"><i id="loadbar"></i></div>
-    <div id="loadmsg">Preparando o salto…</div>
+    <div id="loadmsg" data-i18n="load.prepare">Preparando o salto…</div>
     <div id="loaderr" hidden></div>
   </div>
 </div>
 
 <div id="menu" hidden>
   <div class="col">
-    <div class="eyebrow">Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E</div>
+    <div class="eyebrow" data-i18n="eyebrow.menu">Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E</div>
     <h1 class="title">EMILIUS</h1>
-    <div class="sub">Salto BASE de wingsuit</div>
-    <div class="stats"><span>Saída <b class="num" id="st-exit">3556 m</b></span><span>Pouso <b class="num" id="st-lz">596 m</b></span><span>Desnível <b class="num" id="st-drop">2960 m</b></span><span><b class="num" id="ngates">10</b> portões</span></div>
+    <div class="sub" data-i18n="menu.subtitle">Salto BASE de wingsuit</div>
+    <div class="stats"><span><span data-i18n="stat.exit">Saída</span> <b class="num" id="st-exit">3556 m</b></span><span><span data-i18n="stat.lz">Pouso</span> <b class="num" id="st-lz">596 m</b></span><span><span data-i18n="stat.drop">Desnível</span> <b class="num" id="st-drop">2960 m</b></span><span><b class="num" id="ngates">10</b> <span data-i18n="stat.gates">portões</span></span></div>
     <div class="menu-btns">
-      <button class="mbtn primary" id="bplay">Saltar <small>Espaço</small></button>
-      <button class="mbtn" id="bhelp">Controles <small>H</small></button>
-      <button class="mbtn" id="bsettings">Ajustes</button>
+      <button class="mbtn primary" id="bplay"><span data-i18n="menu.play">Saltar</span> <small data-i18n="key.space">Espaço</small></button>
+      <button class="mbtn" id="bhelp"><span data-i18n="menu.controls">Controles</span> <small>H</small></button>
+      <button class="mbtn" id="bsettings" data-i18n="menu.settings">Ajustes</button>
     </div>
     <div class="record" id="record"></div>
   </div>
-  <div class="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.</div>
+  <div class="credit" data-i18n-html="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.</div>
 </div>
 
 <div id="hud" hidden>
   <div id="hud-left">
     <canvas id="tape" width="116" height="520"></canvas>
     <div class="hud-card readouts">
-      <div class="ro big" id="ro-agl"><div class="k">AGL</div><div class="v num"><span id="agl">0</span><small>m</small></div></div>
-      <div class="ro"><div class="k">Altitude</div><div class="v num"><span id="alt">0</span><small>m</small></div></div>
-      <div class="ro" id="ro-lz"><div class="k">Acima do pouso</div><div class="v num"><span id="alz">0</span><small>m</small></div></div>
-      <div class="ro"><div class="k">Planeio</div><div class="v num"><span id="glide">–</span></div></div>
+      <div class="ro big" id="ro-agl"><div class="k" data-i18n="hud.agl">AGL</div><div class="v num"><span id="agl">0</span><small>m</small></div></div>
+      <div class="ro"><div class="k" data-i18n="hud.altitude">Altitude</div><div class="v num"><span id="alt">0</span><small>m</small></div></div>
+      <div class="ro" id="ro-lz"><div class="k" data-i18n="hud.abovelz">Acima do pouso</div><div class="v num"><span id="alz">0</span><small>m</small></div></div>
+      <div class="ro"><div class="k" data-i18n="hud.glide">Planeio</div><div class="v num"><span id="glide">–</span></div></div>
     </div>
   </div>
   <div id="hud-right" class="hud-card">
     <div id="score" class="num">0</div>
     <div id="mult">×1</div>
-    <div class="line2"><span>Portões</span><b id="gates" class="num">0/9</b></div>
-    <div class="line2"><span>Tempo</span><b id="time" class="num">0:00</b></div>
+    <div class="line2"><span data-i18n="hud.gates">Portões</span><b id="gates" class="num">0/9</b></div>
+    <div class="line2"><span data-i18n="hud.time">Tempo</span><b id="time" class="num">0:00</b></div>
   </div>
   <div id="hud-bottom" class="hud-card">
     <div class="speedrow">
       <div><div id="spd" class="num">0</div><div class="unit">KM/H</div></div>
       <div class="sidevals">
-        <span>Queda <b id="vs" class="num">0</b> km/h</span>
-        <span>Carga <b id="gl" class="num">1.0</b> g</span>
+        <span><span data-i18n="hud.descent">Queda</span> <b id="vs" class="num">0</b> km/h</span>
+        <span><span data-i18n="hud.load">Carga</span> <b id="gl" class="num">1.0</b> g</span>
       </div>
     </div>
     <div class="prox">
-      <div class="lbl"><span>Proximidade</span><span id="proxv" class="num">–</span></div>
+      <div class="lbl"><span data-i18n="hud.proximity">Proximidade</span><span id="proxv" class="num">–</span></div>
       <div class="proxbar"><i id="proxbar"></i><s style="left:50%"></s><s style="left:75%"></s><s style="left:90%"></s></div>
     </div>
   </div>
-  <div id="lzmark" aria-hidden="true"><div class="lzm-ring"></div><div class="lzm-arrow"></div><div class="lzm-lbl"><div class="lzm-top"><b>ALVO</b> <span id="lzm-d" class="num">–</span></div><div id="lzm-h" class="num"></div><div id="lzm-hint"></div></div></div>
+  <div id="lzmark" aria-hidden="true"><div class="lzm-ring"></div><div class="lzm-arrow"></div><div class="lzm-lbl"><div class="lzm-top"><b data-i18n="hud.target">ALVO</b> <span id="lzm-d" class="num">–</span></div><div id="lzm-h" class="num"></div><div id="lzm-hint"></div></div></div>
   <div id="hud-msg"></div>
   <div id="prompt"></div>
   <div id="minimap"><canvas id="mm0" width="300" height="480"></canvas><canvas id="mm1" width="300" height="480"></canvas></div>
   <div id="camtag"></div>
-  <div id="replaytag" hidden>REPLAY <button id="bskip">Pular</button></div>
+  <div id="replaytag" hidden><span data-i18n="replay.label">REPLAY</span> <button id="bskip" data-i18n="replay.skip">Pular</button></div>
 </div>
 
 <div id="touch" hidden>
   <div id="joyzone"><div id="joybase"><div id="joyknob"></div></div></div>
   <button id="btnact">SALTAR</button>
-  <button id="btncam" class="tbtn">Câmera</button>
-  <button id="btnpause" class="tbtn">Pausa</button>
+  <button id="btncam" class="tbtn" data-i18n="touch.camera">Câmera</button>
+  <button id="btnpause" class="tbtn" data-i18n="touch.pause">Pausa</button>
 </div>
 
 <div id="result" class="modal" hidden>
@@ -303,10 +304,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     <h2 id="rtitle">Pouso perfeito</h2>
     <div class="why" id="rwhy"></div>
     <div class="tbl" id="rtable"></div>
-    <div class="newrec" id="rnew" hidden>Novo recorde</div>
+    <div class="newrec" id="rnew" data-i18n="result.newrecord" hidden>Novo recorde</div>
     <div class="row">
-      <button class="btn primary" id="bagain">Voar de novo <kbd>R</kbd></button>
-      <button class="btn" id="breplay">Ver replay</button>
+      <button class="btn primary" id="bagain"><span data-i18n="result.again">Voar de novo</span> <kbd>R</kbd></button>
+      <button class="btn" id="breplay" data-i18n="result.replay">Ver replay</button>
       <button class="btn" id="bmenu">Menu</button>
     </div>
   </div>
@@ -314,10 +315,10 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="pause" class="modal" hidden>
   <div class="card">
-    <h2>Pausa</h2>
+    <h2 data-i18n="pause.title">Pausa</h2>
     <div class="row">
-      <button class="btn primary" id="bresume">Continuar <kbd>P</kbd></button>
-      <button class="btn" id="brestart">Recomeçar <kbd>R</kbd></button>
+      <button class="btn primary" id="bresume"><span data-i18n="pause.resume">Continuar</span> <kbd>P</kbd></button>
+      <button class="btn" id="brestart"><span data-i18n="pause.restart">Recomeçar</span> <kbd>R</kbd></button>
       <button class="btn" id="bpmenu">Menu</button>
     </div>
   </div>
@@ -325,40 +326,41 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="help" class="modal" hidden>
   <div class="card">
-    <h2>Controles</h2>
+    <h2 data-i18n="menu.controls">Controles</h2>
     <div class="keys">
       <h3>Wingsuit</h3>
-      <span><kbd>W</kbd> <kbd>↑</kbd></span><span>Mergulhar: nariz para baixo, ganha velocidade</span>
-      <span><kbd>S</kbd> <kbd>↓</kbd></span><span>Planar e fazer flare: troca velocidade por altura</span>
-      <span><kbd>A</kbd> <kbd>D</kbd></span><span>Inclinar e curvar</span>
-      <span><kbd>Espaço</kbd></span><span>Saltar · abrir o paraquedas</span>
-      <h3>Paraquedas</h3>
-      <span><kbd>A</kbd> <kbd>D</kbd></span><span>Freio esquerdo / direito para curvar</span>
-      <span><kbd>S</kbd> ou <kbd>Espaço</kbd></span><span>Flare com os dois freios, a 3–5 m do chão</span>
-      <span><kbd>W</kbd></span><span>Tirantes dianteiros: desce mais rápido</span>
-      <h3>Geral</h3>
-      <span><kbd>C</kbd></span><span>Trocar câmera</span>
-      <span><kbd>F</kbd> <kbd>M</kbd></span><span>Fumaça · som</span>
-      <span><kbd>P</kbd> <kbd>R</kbd></span><span>Pausa · recomeçar</span>
+      <span><kbd>W</kbd> <kbd>↑</kbd></span><span data-i18n="help.dive">Mergulhar: nariz para baixo, ganha velocidade</span>
+      <span><kbd>S</kbd> <kbd>↓</kbd></span><span data-i18n="help.glideflare">Planar e fazer flare: troca velocidade por altura</span>
+      <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.turn">Inclinar e curvar</span>
+      <span><kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.jumpopen">Saltar · abrir o paraquedas</span>
+      <h3 data-i18n="help.section.parachute">Paraquedas</h3>
+      <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.brakes">Freio esquerdo / direito para curvar</span>
+      <span><kbd>S</kbd> <span data-i18n="help.or">ou</span> <kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.flare">Flare com os dois freios, a 3–5 m do chão</span>
+      <span><kbd>W</kbd></span><span data-i18n="help.frontrisers">Tirantes dianteiros: desce mais rápido</span>
+      <h3 data-i18n="help.section.general">Geral</h3>
+      <span><kbd>C</kbd></span><span data-i18n="help.camera">Trocar câmera</span>
+      <span><kbd>F</kbd> <kbd>M</kbd></span><span data-i18n="help.smokesound">Fumaça · som</span>
+      <span><kbd>P</kbd> <kbd>R</kbd></span><span data-i18n="help.pauserestart">Pausa · recomeçar</span>
     </div>
-    <p class="note">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
-    <p class="note">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
-    <div class="row"><button class="btn primary" id="bhelpclose">Fechar</button></div>
+    <p class="note" data-i18n="help.note1">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
+    <p class="note" data-i18n="help.note2">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
+    <div class="row"><button class="btn primary" id="bhelpclose" data-i18n="action.close">Fechar</button></div>
   </div>
 </div>
 
 <div id="settings" class="modal" hidden>
   <div class="card">
-    <h2>Ajustes</h2>
+    <h2 data-i18n="menu.settings">Ajustes</h2>
     <div class="opts">
-      <div class="opt"><span>Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)</span><button class="btn" id="oa">Ligada</button></div>
-      <div class="opt"><span>Qualidade gráfica</span><button class="btn" id="oq">Média</button></div>
-      <div class="opt"><span>Som</span><button class="btn" id="os">Ligado</button></div>
-      <div class="opt"><span>Inverter arfagem (W puxa, S mergulha)</span><button class="btn" id="oi">Não</button></div>
-      <div class="opt"><span>Fumaça nos pés</span><button class="btn" id="of">Ligada</button></div>
+      <div class="opt"><span data-i18n="set.language">Idioma</span><button class="btn" id="olang">Português</button></div>
+      <div class="opt"><span data-i18n="set.assist">Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)</span><button class="btn" id="oa">Ligada</button></div>
+      <div class="opt"><span data-i18n="set.quality">Qualidade gráfica</span><button class="btn" id="oq">Média</button></div>
+      <div class="opt"><span data-i18n="set.sound">Som</span><button class="btn" id="os">Ligado</button></div>
+      <div class="opt"><span data-i18n="set.invert">Inverter arfagem (W puxa, S mergulha)</span><button class="btn" id="oi">Não</button></div>
+      <div class="opt"><span data-i18n="set.smoke">Fumaça nos pés</span><button class="btn" id="of">Ligada</button></div>
     </div>
     <p class="note" id="perfnote"></p>
-    <div class="row"><button class="btn primary" id="bsetclose">Fechar</button></div>
+    <div class="row"><button class="btn primary" id="bsetclose" data-i18n="action.close">Fechar</button></div>
   </div>
 </div>
 <script type="module">
@@ -381,7 +383,7 @@ function mulberry32(seed) {
   };
 }
 function wrapAngle(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
-function fmt(n) { return Math.round(n).toLocaleString('pt-BR'); }
+function fmt(n) { return Math.round(n).toLocaleString(LANG === 'pt' ? 'pt-BR' : 'en-US'); }
 const $ = (id) => document.getElementById(id);
 function store(key, val) {
   try {
@@ -400,9 +402,9 @@ const SUN_DIR = new THREE.Vector3(Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.sin(
 
 const IS_TOUCH = (('ontouchstart' in window) || navigator.maxTouchPoints > 0) && Math.min(screen.width, screen.height) < 900;
 const QUALITY_PRESETS = {
-  baixa: { pr: 1.0, lod: 0.65, trees: 0.45, treeDist: 2600, clouds: 0.5, name: 'Baixa' },
-  media: { pr: 1.5, lod: 1.0, trees: 0.75, treeDist: 3800, clouds: 0.8, name: 'Média' },
-  alta: { pr: 2.0, lod: 1.45, trees: 1.0, treeDist: 5200, clouds: 1.0, name: 'Alta' },
+  baixa: { pr: 1.0, lod: 0.65, trees: 0.45, treeDist: 2600, clouds: 0.5 },
+  media: { pr: 1.5, lod: 1.0, trees: 0.75, treeDist: 3800, clouds: 0.8 },
+  alta: { pr: 2.0, lod: 1.45, trees: 1.0, treeDist: 5200, clouds: 1.0 },
 };
 const SETTINGS = Object.assign({
   quality: 'alta',
@@ -416,6 +418,344 @@ if (!QUALITY_PRESETS[SETTINGS.quality]) SETTINGS.quality = 'media';
 function saveSettings() { store('settings', SETTINGS); }
 // heightfield resolution is fixed per device class (4 m desktop, 8 m phones)
 const CELL0 = IS_TOUCH ? 8 : 4;
+
+// ---- 05-i18n.js
+// =============================================================== i18n
+const STRINGS = {
+  pt: {
+    'aria.canvas': 'Voo de wingsuit em 3D no Monte Emilius',
+    'eyebrow.loading': "Monte Emilius · 3559 m · Valle d'Aosta",
+    'eyebrow.menu': "Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E",
+    'load.prepare': 'Preparando o salto…',
+    'load.sculpt': 'Esculpindo o maciço do Emilius',
+    'load.detail': 'Detalhando a rocha',
+    'load.shadowsnow': 'Sombras e neve',
+    'load.forest': 'Plantando a floresta',
+    'load.ready': 'Pronto',
+    'load.scene': 'Montando a cena',
+    'error.webgl2': 'Este navegador não liberou WebGL 2. Tente o Chrome, Edge, Firefox ou Safari atualizados, com aceleração de hardware ativada.',
+    'error.worldbuild': 'Não foi possível montar o mundo 3D: ',
+
+    'menu.subtitle': 'Salto BASE de wingsuit',
+    'menu.play': 'Saltar',
+    'menu.controls': 'Controles',
+    'menu.settings': 'Ajustes',
+    'menu.record': 'Recorde neste aparelho: {n} pontos',
+    'menu.norecord': 'Sem recorde ainda neste aparelho.',
+    'stat.exit': 'Saída',
+    'stat.lz': 'Pouso',
+    'stat.drop': 'Desnível',
+    'stat.gates': 'portões',
+    'key.space': 'Espaço',
+    'credit': 'Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.',
+
+    'hud.agl': 'AGL',
+    'hud.altitude': 'Altitude',
+    'hud.abovelz': 'Acima do pouso',
+    'hud.glide': 'Planeio',
+    'hud.gates': 'Portões',
+    'hud.time': 'Tempo',
+    'hud.descent': 'Queda',
+    'hud.load': 'Carga',
+    'hud.proximity': 'Proximidade',
+    'hud.target': 'ALVO',
+    'hud.camera': 'Câmera',
+    'hud.smoke': 'Fumaça',
+    'replay.label': 'REPLAY',
+    'replay.skip': 'Pular',
+    'touch.camera': 'Câmera',
+    'touch.pause': 'Pausa',
+    'btn.jump': 'SALTAR',
+    'btn.open': 'ABRIR',
+    'btn.flare': 'FLARE',
+    'btn.ok': 'OK',
+
+    'result.newrecord': 'Novo recorde',
+    'result.again': 'Voar de novo',
+    'result.replay': 'Ver replay',
+    'result.title.tree': 'Árvore',
+    'result.title.water': 'Impacto na água',
+    'result.title.plf': 'Pouso com rolamento',
+    'result.title.waterland': 'Pouso na água',
+    'result.title.treeland': 'Preso na árvore',
+    'result.why.tree': 'Você acertou uma copa a {kmh} km/h.',
+    'result.why.water': 'Entrada na água a {kmh} km/h.',
+    'result.why.terrain': 'Contato com o relevo a {kmh} km/h. Abra mais alto ou suba com S antes da crista.',
+    'result.why.landing': 'Toque a {vs} m/s de descida, {dist} m do centro do alvo.',
+    'result.row.time': 'Tempo de wingsuit',
+    'result.row.distance': 'Distância voada',
+    'result.row.maxspeed': 'Velocidade máxima',
+    'result.row.gates': 'Portões {passed}/{total}',
+    'result.row.scrapes': 'Raspadas no relevo',
+    'result.row.speedbonus': 'Bônus de velocidade',
+    'result.row.landing': 'Pouso',
+    'result.row.accuracy': 'Precisão no alvo',
+    'result.row.total': 'Total',
+
+    'pause.title': 'Pausa',
+    'pause.resume': 'Continuar',
+    'pause.restart': 'Recomeçar',
+
+    'help.dive': 'Mergulhar: nariz para baixo, ganha velocidade',
+    'help.glideflare': 'Planar e fazer flare: troca velocidade por altura',
+    'help.turn': 'Inclinar e curvar',
+    'help.jumpopen': 'Saltar · abrir o paraquedas',
+    'help.section.parachute': 'Paraquedas',
+    'help.brakes': 'Freio esquerdo / direito para curvar',
+    'help.flare': 'Flare com os dois freios, a 3–5 m do chão',
+    'help.frontrisers': 'Tirantes dianteiros: desce mais rápido',
+    'help.section.general': 'Geral',
+    'help.camera': 'Trocar câmera',
+    'help.smokesound': 'Fumaça · som',
+    'help.pauserestart': 'Pausa · recomeçar',
+    'help.or': 'ou',
+    'help.note1': 'Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.',
+    'help.note2': 'Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.',
+    'action.close': 'Fechar',
+
+    'set.assist': 'Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)',
+    'set.quality': 'Qualidade gráfica',
+    'set.sound': 'Som',
+    'set.invert': 'Inverter arfagem (W puxa, S mergulha)',
+    'set.smoke': 'Fumaça nos pés',
+    'set.language': 'Idioma',
+    'set.perfnote': 'Relevo com resolução de {cell} m ({samples} amostras), gerado em {time} s; {trees} árvores.',
+    'state.on': 'Ligado',
+    'state.off': 'Desligado',
+    'state.yes': 'Sim',
+    'state.no': 'Não',
+    'quality.baixa': 'Baixa',
+    'quality.media': 'Média',
+    'quality.alta': 'Alta',
+    'cam.chase': 'Perseguição',
+    'cam.helmet': 'Capacete',
+    'cam.drone': 'Drone lateral',
+    'cam.cinema': 'Cinema',
+
+    'callout.exit': 'Saída!',
+    'callout.notch': 'Fenda! +{pts}',
+    'callout.gate': 'Portão +{pts}',
+    'callout.gatemissed': 'Portão perdido',
+    'callout.multiplier': 'Multiplicador ×{mult}',
+    'callout.multiplierlost': 'Multiplicador perdido',
+    'callout.altimeter': 'Altímetro {m} m',
+    'callout.opening': 'Abrindo',
+    'callout.branches': 'Galhos! −{pen}',
+    'callout.scraped': 'Raspou! −{pen}',
+    'callout.canopyopen': 'Paraquedas aberto',
+    'callout.impact': 'Impacto',
+    'tier.close': 'Perto',
+    'tier.grazing': 'Rasante',
+    'tier.insane': 'Insano',
+    'land.perfect': 'Pouso perfeito',
+    'land.good': 'Bom pouso',
+    'land.plf': 'Rolamento',
+    'land.hard': 'Pouso duro',
+    'land.water': 'Na água',
+    'land.tree': 'Na árvore',
+
+    'prompt.readyTouch': 'Toque em SALTAR<br><small>depois arraste para baixo para planar</small>',
+    'prompt.readyKey': '<kbd>ESPAÇO</kbd> para saltar<br><small><kbd>S</kbd> ou <kbd>↓</kbd> levanta o nariz · <kbd>W</kbd> ou <kbd>↑</kbd> mergulha · <kbd>A</kbd> <kbd>D</kbd> curva</small>',
+    'prompt.climb': 'Suba!',
+    'prompt.earlyTouch': '<small>arraste para baixo = levantar o nariz · para cima = mergulhar</small>',
+    'prompt.earlyKey': '<small><kbd>S</kbd>/<kbd>↓</kbd> levanta o nariz · <kbd>W</kbd>/<kbd>↑</kbd> mergulha</small>',
+    'prompt.deployTouch': 'Abra o paraquedas',
+    'prompt.deployKey': 'Abra o paraquedas · <kbd>ESPAÇO</kbd>',
+    'prompt.flareTouch': 'Flare!',
+    'prompt.flareKey': 'Flare! <kbd>S</kbd>',
+    'prompt.canopyTouch': '<small>Arraste para curvar · puxe para baixo no flare<br>Siga o marcador laranja até o alvo</small>',
+    'prompt.canopyKey': '<small><kbd>A</kbd> <kbd>D</kbd> curvar · <kbd>S</kbd> flare perto do chão<br>Siga o marcador laranja até o alvo</small>',
+    'prompt.resultKey': '<kbd>ESPAÇO</kbd> resultado',
+
+    'aid.above': '{m} m acima',
+    'aid.online': 'Na linha do alvo ✓',
+    'aid.short': 'Não alcança: vá reto, sem freio',
+    'aid.high': 'Alto demais: gaste altura com curvas',
+    'aid.aim': 'Aponte para o alvo',
+  },
+
+  en: {
+    'aria.canvas': '3D wingsuit flight over Monte Emilius',
+    'eyebrow.loading': "Monte Emilius · 3559 m · Aosta Valley",
+    'eyebrow.menu': "Monte Emilius · 3559 m · Aosta Valley · 45°40′N 7°23′E",
+    'load.prepare': 'Preparing the jump…',
+    'load.sculpt': 'Sculpting the Emilius massif',
+    'load.detail': 'Detailing the rock',
+    'load.shadowsnow': 'Shadows and snow',
+    'load.forest': 'Planting the forest',
+    'load.ready': 'Ready',
+    'load.scene': 'Setting up the scene',
+    'error.webgl2': 'This browser did not enable WebGL 2. Try an up-to-date Chrome, Edge, Firefox or Safari with hardware acceleration turned on.',
+    'error.worldbuild': 'Could not build the 3D world: ',
+
+    'menu.subtitle': 'Wingsuit BASE jump',
+    'menu.play': 'Jump',
+    'menu.controls': 'Controls',
+    'menu.settings': 'Settings',
+    'menu.record': 'Best on this device: {n} points',
+    'menu.norecord': 'No record on this device yet.',
+    'stat.exit': 'Exit',
+    'stat.lz': 'Landing',
+    'stat.drop': 'Drop',
+    'stat.gates': 'gates',
+    'key.space': 'Space',
+    'credit': 'Inspired by the flight of <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit on Monte Emilius</a>. Terrain is procedurally reconstructed.',
+
+    'hud.agl': 'AGL',
+    'hud.altitude': 'Altitude',
+    'hud.abovelz': 'Above landing',
+    'hud.glide': 'Glide',
+    'hud.gates': 'Gates',
+    'hud.time': 'Time',
+    'hud.descent': 'Descent',
+    'hud.load': 'Load',
+    'hud.proximity': 'Proximity',
+    'hud.target': 'TARGET',
+    'hud.camera': 'Camera',
+    'hud.smoke': 'Smoke',
+    'replay.label': 'REPLAY',
+    'replay.skip': 'Skip',
+    'touch.camera': 'Camera',
+    'touch.pause': 'Pause',
+    'btn.jump': 'JUMP',
+    'btn.open': 'OPEN',
+    'btn.flare': 'FLARE',
+    'btn.ok': 'OK',
+
+    'result.newrecord': 'New record',
+    'result.again': 'Fly again',
+    'result.replay': 'Watch replay',
+    'result.title.tree': 'Tree',
+    'result.title.water': 'Water impact',
+    'result.title.plf': 'Roll landing',
+    'result.title.waterland': 'Water landing',
+    'result.title.treeland': 'Stuck in a tree',
+    'result.why.tree': 'You hit a treetop at {kmh} km/h.',
+    'result.why.water': 'Water entry at {kmh} km/h.',
+    'result.why.terrain': 'Terrain contact at {kmh} km/h. Deploy higher or climb with S before the ridge.',
+    'result.why.landing': 'Touchdown at {vs} m/s descent, {dist} m from the center of the target.',
+    'result.row.time': 'Wingsuit time',
+    'result.row.distance': 'Distance flown',
+    'result.row.maxspeed': 'Top speed',
+    'result.row.gates': 'Gates {passed}/{total}',
+    'result.row.scrapes': 'Terrain scrapes',
+    'result.row.speedbonus': 'Speed bonus',
+    'result.row.landing': 'Landing',
+    'result.row.accuracy': 'Target accuracy',
+    'result.row.total': 'Total',
+
+    'pause.title': 'Paused',
+    'pause.resume': 'Resume',
+    'pause.restart': 'Restart',
+
+    'help.dive': 'Dive: nose down, gain speed',
+    'help.glideflare': 'Glide and flare: trade speed for height',
+    'help.turn': 'Bank and turn',
+    'help.jumpopen': 'Jump · open the parachute',
+    'help.section.parachute': 'Parachute',
+    'help.brakes': 'Left / right brake to turn',
+    'help.flare': 'Flare with both brakes, 3–5 m above the ground',
+    'help.frontrisers': 'Front risers: descend faster',
+    'help.section.general': 'General',
+    'help.camera': 'Switch camera',
+    'help.smokesound': 'Smoke · sound',
+    'help.pauserestart': 'Pause · restart',
+    'help.or': 'or',
+    'help.note1': 'With flight assist on (Settings), the pilot pulls the nose up on their own when about to hit, and grazing touches become a scrape that costs points instead of ending the flight. In the first seconds after the jump the body positions itself: just wait for the wingsuit to inflate.',
+    'help.note2': 'Fly close to the terrain to earn proximity points; staying close for a few seconds raises the multiplier. Fly through the 10 gates (the notch between the two towers is worth more) and open the parachute above the valley. Land on the orange target (the orange smoke shows where it is and where the wind is going): the altimeter beep tells you when to open. Under canopy, the on-screen marker points at the target and the yellow ring on the ground shows where you will land if you fly straight — it turns green when it is on the target. Gamepad: left stick, A for action, B for camera, triggers as brakes. On mobile: drag on the left to steer, orange button for the action.',
+    'action.close': 'Close',
+
+    'set.assist': 'Flight assist (pulls the nose up before impact and forgives grazing touches)',
+    'set.quality': 'Graphics quality',
+    'set.sound': 'Sound',
+    'set.invert': 'Invert pitch (W pulls, S dives)',
+    'set.smoke': 'Foot smoke',
+    'set.language': 'Language',
+    'set.perfnote': 'Terrain at {cell} m resolution ({samples} samples), generated in {time} s; {trees} trees.',
+    'state.on': 'On',
+    'state.off': 'Off',
+    'state.yes': 'Yes',
+    'state.no': 'No',
+    'quality.baixa': 'Low',
+    'quality.media': 'Medium',
+    'quality.alta': 'High',
+    'cam.chase': 'Chase',
+    'cam.helmet': 'Helmet',
+    'cam.drone': 'Side drone',
+    'cam.cinema': 'Cinema',
+
+    'callout.exit': 'Exit!',
+    'callout.notch': 'Notch! +{pts}',
+    'callout.gate': 'Gate +{pts}',
+    'callout.gatemissed': 'Gate missed',
+    'callout.multiplier': 'Multiplier ×{mult}',
+    'callout.multiplierlost': 'Multiplier lost',
+    'callout.altimeter': 'Altimeter {m} m',
+    'callout.opening': 'Opening',
+    'callout.branches': 'Branches! −{pen}',
+    'callout.scraped': 'Scraped! −{pen}',
+    'callout.canopyopen': 'Parachute open',
+    'callout.impact': 'Impact',
+    'tier.close': 'Close',
+    'tier.grazing': 'Grazing',
+    'tier.insane': 'Insane',
+    'land.perfect': 'Perfect landing',
+    'land.good': 'Good landing',
+    'land.plf': 'Roll',
+    'land.hard': 'Hard landing',
+    'land.water': 'In the water',
+    'land.tree': 'In a tree',
+
+    'prompt.readyTouch': 'Tap JUMP<br><small>then drag down to glide</small>',
+    'prompt.readyKey': '<kbd>SPACE</kbd> to jump<br><small><kbd>S</kbd> or <kbd>↓</kbd> pulls the nose up · <kbd>W</kbd> or <kbd>↑</kbd> dives · <kbd>A</kbd> <kbd>D</kbd> turn</small>',
+    'prompt.climb': 'Pull up!',
+    'prompt.earlyTouch': '<small>drag down = pull the nose up · drag up = dive</small>',
+    'prompt.earlyKey': '<small><kbd>S</kbd>/<kbd>↓</kbd> pulls the nose up · <kbd>W</kbd>/<kbd>↑</kbd> dives</small>',
+    'prompt.deployTouch': 'Open the parachute',
+    'prompt.deployKey': 'Open the parachute · <kbd>SPACE</kbd>',
+    'prompt.flareTouch': 'Flare!',
+    'prompt.flareKey': 'Flare! <kbd>S</kbd>',
+    'prompt.canopyTouch': '<small>Drag to turn · pull down to flare<br>Follow the orange marker to the target</small>',
+    'prompt.canopyKey': '<small><kbd>A</kbd> <kbd>D</kbd> turn · <kbd>S</kbd> flare near the ground<br>Follow the orange marker to the target</small>',
+    'prompt.resultKey': '<kbd>SPACE</kbd> results',
+
+    'aid.above': '{m} m above',
+    'aid.online': 'On line with the target ✓',
+    'aid.short': "Won't make it: fly straight, no brakes",
+    'aid.high': 'Too high: burn height with turns',
+    'aid.aim': 'Aim for the target',
+  },
+};
+
+function detectLang() {
+  const saved = store('lang');
+  if (saved === 'pt' || saved === 'en') return saved;
+  return /^pt\b/i.test(navigator.language || '') ? 'pt' : 'en';
+}
+let LANG = detectLang();
+
+function i18n(key, params) {
+  let s = STRINGS[LANG][key];
+  if (s === undefined) s = STRINGS.pt[key] !== undefined ? STRINGS.pt[key] : key;
+  if (params) for (const k in params) s = s.split('{' + k + '}').join(params[k]);
+  return s;
+}
+
+function applyI18n() {
+  document.documentElement.lang = LANG === 'pt' ? 'pt-BR' : 'en';
+  $('c').setAttribute('aria-label', i18n('aria.canvas'));
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = i18n(el.dataset.i18n);
+  for (const el of document.querySelectorAll('[data-i18n-html]')) el.innerHTML = i18n(el.dataset.i18nHtml);
+  updateMenuRecord();
+  if (!$('settings').hidden) refreshSettings();
+  if (GAME.state === 'result') renderResults();
+}
+
+function setLang(l) {
+  LANG = l;
+  store('lang', l);
+  applyI18n();
+}
 
 // ---- terrain-core.js
 // ============================================================================
@@ -1456,13 +1796,13 @@ function addSlopeDetail(L) {
 
 async function buildWorld(progress) {
   const t0 = performance.now();
-  const { L0, L2 } = await generateHeights((p) => progress(p * 0.8, 'Esculpindo o maciço do Emilius'));
+  const { L0, L2 } = await generateHeights((p) => progress(p * 0.8, i18n('load.sculpt')));
   WORLD.L0 = L0; WORLD.L2 = L2;
-  progress(0.8, 'Detalhando a rocha'); await nextFrame();
+  progress(0.8, i18n('load.detail')); await nextFrame();
   addSlopeDetail(L0);
   blendEdgeToFar(L0, L2);
   const t1 = performance.now();
-  progress(0.82, 'Sombras e neve'); await nextFrame();
+  progress(0.82, i18n('load.shadowsnow')); await nextFrame();
   bakeLevel(L2, null, true);
   const L2H = L2.horizon;
   const outer = (x, z) => {
@@ -1470,15 +1810,15 @@ async function buildWorld(progress) {
     const i = fx | 0, j = fz | 0, u = fx - i, v = fz - j, n = L2.nx;
     return (L2H[j * n + i] * (1 - u) + L2H[j * n + i + 1] * u) * (1 - v) + (L2H[(j + 1) * n + i] * (1 - u) + L2H[(j + 1) * n + i + 1] * u) * v;
   };
-  progress(0.88, 'Sombras e neve'); await nextFrame();
+  progress(0.88, i18n('load.shadowsnow')); await nextFrame();
   bakeLevel(L0, outer, false);
   L2.horizon = null; L0.horizon = null;
   chunkBounds(L0); chunkBounds(L2);
-  progress(0.95, 'Plantando a floresta'); await nextFrame();
+  progress(0.95, i18n('load.forest')); await nextFrame();
   WORLD.trees = placeTrees(L0);
   const t2 = performance.now();
   WORLD.genStats = { heights: Math.round(t1 - t0), bake: Math.round(t2 - t1), trees: WORLD.trees.count };
-  progress(1, 'Pronto');
+  progress(1, i18n('load.ready'));
 }
 
 // ---- 20-shaders.js
@@ -3638,7 +3978,7 @@ function autopilot(inp, gates, dt) {
 // ---- 60-camera.js
 // ================================================================ CAMERA
 const CAM = {
-  mode: 0, names: ['Perseguição', 'Capacete', 'Drone lateral', 'Cinema'],
+  mode: 0, nameKeys: ['cam.chase', 'cam.helmet', 'cam.drone', 'cam.cinema'],
   dir: new THREE.Vector3(0, 0, -1), upS: new THREE.Vector3(0, 1, 0),
   pos: new THREE.Vector3(), look: new THREE.Vector3(),
   fov: 70, trauma: 0, t: 0,
@@ -4289,7 +4629,7 @@ function doJump() {
   SIM.vel.copy(f).multiplyScalar(6.2); SIM.vel.y = 2.0;
   SIM.inflate = 0;
   SFX.jump();
-  if (GAME.state === 'play') callout('Saída!', 'orange', true);
+  if (GAME.state === 'play') callout(i18n('callout.exit'), 'orange', true);
 }
 function action() {
   if (GAME.state !== 'play' || GAME.paused) return;
@@ -4331,11 +4671,11 @@ function gameplay(dt) {
         const pts = (g.notch ? 750 : 250) * GAME.mult;
         GAME.gatePts += pts; GAME.score += pts; GAME.gatesPassed++;
         SFX.gate(g.notch);
-        if (live) callout(g.notch ? `Fenda! +${pts}` : `Portão +${pts}`, 'lake', !g.notch);
+        if (live) callout(i18n(g.notch ? 'callout.notch' : 'callout.gate', { pts }), 'lake', !g.notch);
       } else if (r < g.r * 5) {
         g.state = 2; g.t = 0;
         for (let j = 0; j < i; j++) if (R.gates[j].state === 0) { R.gates[j].state = 2; R.gates[j].t = 0; }
-        if (live) callout('Portão perdido', '', true);
+        if (live) callout(i18n('callout.gatemissed'), '', true);
       }
     }
   }
@@ -4355,15 +4695,15 @@ function gameplay(dt) {
     if (s.phase === 'fly') {
       if (d < 30) {
         GAME.streakT += dt; GAME.farT = 0;
-        if (GAME.streakT > 3.2 && GAME.mult < 5) { GAME.mult++; GAME.streakT = 0; if (live) callout(`Multiplicador ×${GAME.mult}`, 'orange', true); }
+        if (GAME.streakT > 3.2 && GAME.mult < 5) { GAME.mult++; GAME.streakT = 0; if (live) callout(i18n('callout.multiplier', { mult: GAME.mult }), 'orange', true); }
       } else {
         GAME.farT += dt;
-        if (GAME.farT > 2.6) { if (GAME.mult > 1 && live) callout('Multiplicador perdido', '', true); GAME.mult = 1; GAME.streakT = 0; GAME.farT = 0; }
+        if (GAME.farT > 2.6) { if (GAME.mult > 1 && live) callout(i18n('callout.multiplierlost'), '', true); GAME.mult = 1; GAME.streakT = 0; GAME.farT = 0; }
       }
       const tier = d < 5 ? 3 : d < 10 ? 2 : d < 20 ? 1 : 0;
       for (let k = 1; k <= 3; k++) GAME.tierT[k] = Math.max(0, GAME.tierT[k] - dt);
       if (tier > 0 && tier > GAME.tier && GAME.tierT[tier] <= 0 && live) {
-        callout(['', 'Perto', 'Rasante', 'Insano'][tier], tier === 3 ? 'red' : tier === 2 ? 'orange' : '', tier === 1);
+        callout(['', i18n('tier.close'), i18n('tier.grazing'), i18n('tier.insane')][tier], tier === 3 ? 'red' : tier === 2 ? 'orange' : '', tier === 1);
         GAME.tierT[tier] = 3;
       }
       GAME.tier = tier;
@@ -4371,7 +4711,7 @@ function gameplay(dt) {
     // audible altimeter (height above the landing field)
     const alz = s.pos.y - TC.LZ.h;
     if (s.phase === 'fly' && nextGateIndex() === -1 || alz < 700) {
-      if (GAME.warn === 0 && alz < 640) { GAME.warn = 1; SFX.beepWarn(); if (live) callout('Altímetro 640 m', 'orange', true); }
+      if (GAME.warn === 0 && alz < 640) { GAME.warn = 1; SFX.beepWarn(); if (live) callout(i18n('callout.altimeter', { m: 640 }), 'orange', true); }
       if (alz < 420) { GAME.beepT -= dt; if (GAME.beepT <= 0) { SFX.beepNow(); GAME.beepT = 1.3; } GAME.warn = 2; }
     }
   }
@@ -4381,27 +4721,27 @@ function handleEvents() {
   const live = GAME.state === 'play';
   while (EVENTS.length) {
     const e = EVENTS.shift();
-    if (e.type === 'deploy') { SFX.deploy(); if (live) callout('Abrindo', '', true); }
+    if (e.type === 'deploy') { SFX.deploy(); if (live) callout(i18n('callout.opening'), '', true); }
     else if (e.type === 'scrape') {
       GAME.scrapes++;
       const pen = Math.min(GAME.score, 250);
       GAME.score -= pen; GAME.mult = 1; GAME.streakT = 0;
       noiseBurst(0.35, e.kind === 'tree' ? 1500 : 500, 0.5, 'bandpass', 0, 0.9);
       addTrauma(0.55);
-      if (live) callout(e.kind === 'tree' ? `Galhos! −${pen}` : `Raspou! −${pen}`, 'orange', true);
+      if (live) callout(i18n(e.kind === 'tree' ? 'callout.branches' : 'callout.scraped', { pen }), 'orange', true);
     }
-    else if (e.type === 'canopyOpen') { SFX.open(); addTrauma(clamp(SIM.openShock / 5, 0.2, 0.8)); if (live) callout('Paraquedas aberto', 'lake', true); }
+    else if (e.type === 'canopyOpen') { SFX.open(); addTrauma(clamp(SIM.openShock / 5, 0.2, 0.8)); if (live) callout(i18n('callout.canopyopen'), 'lake', true); }
     else if (e.type === 'land') {
       SFX.land(e.kind);
       if (e.kind === 'water') SFX.splash();
       addTrauma(e.kind === 'hard' ? 0.7 : 0.25);
-      if (live) callout({ perfect: 'Pouso perfeito', good: 'Bom pouso', plf: 'Rolamento', hard: 'Pouso duro', water: 'Na água', tree: 'Na árvore' }[e.kind], e.kind === 'perfect' ? 'lake' : e.kind === 'good' ? '' : 'orange');
+      if (live) callout(i18n('land.' + e.kind),e.kind === 'perfect' ? 'lake' : e.kind === 'good' ? '' : 'orange');
       GAME.endT = 0;
     } else if (e.type === 'crash') {
       if (e.cause === 'water') SFX.splash(); else SFX.crash();
       addTrauma(1);
       const fl = $('flash'); fl.style.transition = 'none'; fl.style.opacity = 0.85; requestAnimationFrame(() => { fl.style.transition = 'opacity 0.9s'; fl.style.opacity = 0; });
-      if (live) callout('Impacto', 'red');
+      if (live) callout(i18n('callout.impact'), 'red');
       GAME.endT = 0;
     }
   }
@@ -4419,36 +4759,40 @@ function computeScore() {
   const total = s.outcome === 'crash' ? b.prox + b.gates : b.prox + b.gates + b.speed + b.landing + b.accuracy;
   return { b, total, ok };
 }
-function showResults() {
-  if (GAME.state !== 'play') return;
-  GAME.state = 'result';
-  const { b, total, ok } = computeScore();
+function renderResults() {
+  const { b, total } = computeScore();
   const s = SIM;
   const T = $('rtitle'), why = $('rwhy');
   T.className = '';
   const kmh = Math.round((s.crashSpeed || 0) * 3.6);
   if (s.outcome === 'crash') {
-    T.textContent = { terrain: 'Impacto', tree: 'Árvore', water: 'Impacto na água' }[s.crashCause] || 'Impacto';
+    T.textContent = { terrain: i18n('callout.impact'), tree: i18n('result.title.tree'), water: i18n('result.title.water') }[s.crashCause] || i18n('callout.impact');
     T.className = 'bad';
-    why.textContent = s.crashCause === 'tree' ? `Você acertou uma copa a ${kmh} km/h.` : s.crashCause === 'water' ? `Entrada na água a ${kmh} km/h.` : `Contato com o relevo a ${kmh} km/h. Abra mais alto ou suba com S antes da crista.`;
+    why.textContent = i18n(s.crashCause === 'tree' ? 'result.why.tree' : s.crashCause === 'water' ? 'result.why.water' : 'result.why.terrain', { kmh });
   } else {
     const L = s.landing;
-    T.textContent = { perfect: 'Pouso perfeito', good: 'Bom pouso', plf: 'Pouso com rolamento', hard: 'Pouso duro', water: 'Pouso na água', tree: 'Preso na árvore' }[L.kind];
+    T.textContent = { perfect: i18n('land.perfect'), good: i18n('land.good'), plf: i18n('result.title.plf'), hard: i18n('land.hard'), water: i18n('result.title.waterland'), tree: i18n('result.title.treeland') }[L.kind];
     T.className = L.kind === 'perfect' || L.kind === 'good' ? 'good' : 'bad';
-    why.textContent = `Toque a ${L.vs.toFixed(1)} m/s de descida, ${Math.round(L.dist)} m do centro do alvo.`;
+    why.textContent = i18n('result.why.landing', { vs: L.vs.toFixed(1), dist: Math.round(L.dist) });
   }
   const mm = Math.floor(GAME.flightT / 60), ss = Math.floor(GAME.flightT % 60).toString().padStart(2, '0');
   const rows = [
-    ['Tempo de wingsuit', `${mm}:${ss}`],
-    ['Distância voada', `${(GAME.dist / 1000).toFixed(2)} km`],
-    ['Velocidade máxima', `${Math.round(GAME.maxSpeed * 3.6)} km/h`],
-    ['Proximidade', fmt(b.prox)],
-    [`Portões ${GAME.gatesPassed}/${R.gates.length}`, fmt(b.gates)],
+    [i18n('result.row.time'), `${mm}:${ss}`],
+    [i18n('result.row.distance'), `${(GAME.dist / 1000).toFixed(2)} km`],
+    [i18n('result.row.maxspeed'), `${Math.round(GAME.maxSpeed * 3.6)} km/h`],
+    [i18n('hud.proximity'), fmt(b.prox)],
+    [i18n('result.row.gates', { passed: GAME.gatesPassed, total: R.gates.length }), fmt(b.gates)],
   ];
-  if (GAME.scrapes) rows.push(['Raspadas no relevo', String(GAME.scrapes)]);
-  if (s.outcome !== 'crash') rows.push(['Bônus de velocidade', fmt(b.speed)], ['Pouso', fmt(b.landing)], ['Precisão no alvo', fmt(b.accuracy)]);
-  rows.push(['Total', fmt(total)]);
+  if (GAME.scrapes) rows.push([i18n('result.row.scrapes'), String(GAME.scrapes)]);
+  if (s.outcome !== 'crash') rows.push([i18n('result.row.speedbonus'), fmt(b.speed)], [i18n('result.row.landing'), fmt(b.landing)], [i18n('result.row.accuracy'), fmt(b.accuracy)]);
+  rows.push([i18n('result.row.total'), fmt(total)]);
   $('rtable').innerHTML = rows.map(([k, v], i) => i === rows.length - 1 ? `<span class="tot">${k}</span><span class="tot">${v}</span>` : `<span>${k}</span><span>${v}</span>`).join('');
+}
+function showResults() {
+  if (GAME.state !== 'play') return;
+  GAME.state = 'result';
+  const { total, ok } = computeScore();
+  renderResults();
   const newRec = ok && total > GAME.best;
   if (newRec) { GAME.best = total; store('best', total); }
   $('rnew').hidden = !newRec;
@@ -4644,20 +4988,20 @@ function updateHud(dt) {
   // prompts
   const P = $('prompt');
   let txt = '', blink = false, top = false;
-  if (s.phase === 'ready') txt = IS_TOUCH ? 'Toque em SALTAR<br><small>depois arraste para baixo para planar</small>' : '<kbd>ESPAÇO</kbd> para saltar<br><small><kbd>S</kbd> ou <kbd>↓</kbd> levanta o nariz · <kbd>W</kbd> ou <kbd>↑</kbd> mergulha · <kbd>A</kbd> <kbd>D</kbd> curva</small>';
-  else if ((s.phase === 'fly' || s.phase === 'exit') && s.warn > 0.35) { txt = 'Suba!'; blink = true; }
-  else if ((s.phase === 'exit' || s.phase === 'fly') && s.airT < 7) txt = IS_TOUCH ? '<small>arraste para baixo = levantar o nariz · para cima = mergulhar</small>' : '<small><kbd>S</kbd>/<kbd>↓</kbd> levanta o nariz · <kbd>W</kbd>/<kbd>↑</kbd> mergulha</small>';
-  else if (s.phase === 'fly' && alz < 420 && alz > 0) { txt = IS_TOUCH ? 'Abra o paraquedas' : 'Abra o paraquedas · <kbd>ESPAÇO</kbd>'; blink = true; }
+  if (s.phase === 'ready') txt = i18n(IS_TOUCH ? 'prompt.readyTouch' : 'prompt.readyKey');
+  else if ((s.phase === 'fly' || s.phase === 'exit') && s.warn > 0.35) { txt = i18n('prompt.climb'); blink = true; }
+  else if ((s.phase === 'exit' || s.phase === 'fly') && s.airT < 7) txt = i18n(IS_TOUCH ? 'prompt.earlyTouch' : 'prompt.earlyKey');
+  else if (s.phase === 'fly' && alz < 420 && alz > 0) { txt = i18n(IS_TOUCH ? 'prompt.deployTouch' : 'prompt.deployKey'); blink = true; }
   else if (s.phase === 'canopy') {
     const feet = s.pos.y - 1.02 - ground;
-    if (feet < 9 && feet > 1) { txt = IS_TOUCH ? 'Flare!' : 'Flare! <kbd>S</kbd>'; blink = true; }
-    else if (s.phaseT < 6) { top = true; txt = IS_TOUCH ? '<small>Arraste para curvar · puxe para baixo no flare<br>Siga o marcador laranja até o alvo</small>' : '<small><kbd>A</kbd> <kbd>D</kbd> curvar · <kbd>S</kbd> flare perto do chão<br>Siga o marcador laranja até o alvo</small>'; }
-  } else if ((s.phase === 'landed' || s.phase === 'crashed') && GAME.endT > 1.2) txt = IS_TOUCH ? '' : '<kbd>ESPAÇO</kbd> resultado';
+    if (feet < 9 && feet > 1) { txt = i18n(IS_TOUCH ? 'prompt.flareTouch' : 'prompt.flareKey'); blink = true; }
+    else if (s.phaseT < 6) { top = true; txt = i18n(IS_TOUCH ? 'prompt.canopyTouch' : 'prompt.canopyKey'); }
+  } else if ((s.phase === 'landed' || s.phase === 'crashed') && GAME.endT > 1.2) txt = IS_TOUCH ? '' : i18n('prompt.resultKey');
   if (P.innerHTML !== txt) P.innerHTML = txt;
   P.classList.toggle('blink', blink);
   P.classList.toggle('top', top);
-  $('camtag').innerHTML = `Câmera <b>${CAM.names[CAM.mode]}</b> · C<br>Fumaça ${SETTINGS.smoke ? 'ligada' : 'desligada'} · F`;
-  $('btnact').textContent = s.phase === 'ready' ? 'SALTAR' : s.phase === 'fly' ? 'ABRIR' : s.phase === 'canopy' ? 'FLARE' : 'OK';
+  $('camtag').innerHTML = `${i18n('hud.camera')} <b>${i18n(CAM.nameKeys[CAM.mode])}</b> · C<br>${i18n('hud.smoke')} ${i18n(SETTINGS.smoke ? 'state.on' : 'state.off')} · F`;
+  $('btnact').textContent = i18n(s.phase === 'ready' ? 'btn.jump' : s.phase === 'fly' ? 'btn.open' : s.phase === 'canopy' ? 'btn.flare' : 'btn.ok');
   drawMinimapDyn();
 }
 
@@ -4679,7 +5023,7 @@ function predictTouchdown(s) {
 }
 function setText(id, v) { if (AID.txt[id] !== v) { AID.txt[id] = v; $(id).textContent = v; } }
 function fmtDist(d) {
-  if (d >= 1000) return (d / 1000).toFixed(1).replace('.', ',') + ' km';
+  if (d >= 1000) { const km = (d / 1000).toFixed(1); return (LANG === 'pt' ? km.replace('.', ',') : km) + ' km'; }
   return (d >= 100 ? Math.round(d / 10) * 10 : Math.round(d)) + ' m';
 }
 function updateLandingAids(dt, cam) {
@@ -4737,7 +5081,7 @@ function updateLandingAids(dt, cam) {
     // once the target is big on screen the marker steps back so it doesn't cover it
     if (ringD > 130 || (s.phase === 'canopy' && dH < 55 && feet < 45)) cls += ' dim';
     setText('lzm-d', fmtDist(dH));
-    setText('lzm-h', alz > 3 ? `${Math.round(alz)} m acima` : '');
+    setText('lzm-h', alz > 3 ? i18n('aid.above', { m: Math.round(alz) }) : '');
     // glide hint under canopy (updated twice a second so it doesn't flicker)
     AID.hintT -= dt;
     if (AID.hintT <= 0) {
@@ -4747,10 +5091,10 @@ function updateLandingAids(dt, cam) {
         const alt = Math.max(0, s.pos.y - 1.02 - R.lzY);
         const ux = (LZ.x - s.pos.x) / Math.max(1, dH), uz = (LZ.z - s.pos.z) / Math.max(1, dH);
         const reach = alt / 4.8 * (11.2 + WIND.x * ux + WIND.z * uz);   // straight at it, full glide
-        if (predErr < TARGET_R * 1.3) { hint = 'Na linha do alvo ✓'; hc = 'good'; }
-        else if (reach < dH * 0.9) { hint = 'Não alcança: vá reto, sem freio'; hc = 'bad'; }
-        else if (reach > dH + 220 && alt > 70) { hint = 'Alto demais: gaste altura com curvas'; hc = 'warn'; }
-        else { hint = 'Aponte para o alvo'; hc = ''; }
+        if (predErr < TARGET_R * 1.3) { hint = i18n('aid.online'); hc = 'good'; }
+        else if (reach < dH * 0.9) { hint = i18n('aid.short'); hc = 'bad'; }
+        else if (reach > dH + 220 && alt > 70) { hint = i18n('aid.high'); hc = 'warn'; }
+        else { hint = i18n('aid.aim'); hc = ''; }
       }
       AID.hint = hint; AID.hintCls = hc;
       setText('lzm-hint', hint);
@@ -4791,13 +5135,16 @@ function goFullscreenLandscape() {
   if (req) { try { const p = req.call(el); if (p && p.then) p.then(lock).catch(lock); else lock(); } catch (e) { lock(); } }
   else lock();
 }
+function updateMenuRecord() {
+  $('record').textContent = GAME.best ? i18n('menu.record', { n: fmt(GAME.best) }) : i18n('menu.norecord');
+  $('ngates').textContent = String(TC.GATES.length);
+}
 function toMenu() {
   GAME.state = 'menu'; GAME.paused = false;
   show('menu', true); show('scrim', true); show('hud', false); show('result', false); show('pause', false); show('touch', false);
   $('replaytag').hidden = true;
-  $('record').textContent = GAME.best ? `Recorde neste aparelho: ${fmt(GAME.best)} pontos` : 'Sem recorde ainda neste aparelho.';
-  $('ngates').textContent = String(TC.GATES.length);
-  const ex = Math.round(R.exitY), lz = Math.round(groundHeight(TC.LZ.x, TC.LZ.z));
+  updateMenuRecord();
+  const ex =Math.round(R.exitY), lz = Math.round(groundHeight(TC.LZ.x, TC.LZ.z));
   $('st-exit').textContent = ex + ' m'; $('st-lz').textContent = lz + ' m'; $('st-drop').textContent = (ex - lz) + ' m';
   resetRun();
   GAME.attractT = 0;
@@ -4822,13 +5169,14 @@ function togglePause(force) {
 function cycleCam() { CAM.mode = (CAM.mode + 1) % 4; CAM.shot = null; SETTINGS.cam = CAM.mode; saveSettings(); SFX.click(); }
 function toggleHelp(on) { const h = $('help'); h.hidden = on !== undefined ? !on : !h.hidden; if (!h.hidden) { if (GAME.state === 'play') togglePause(true); setTimeout(() => $('bhelpclose').focus(), 30); } }
 function refreshSettings() {
-  $('oq').textContent = QUALITY_PRESETS[SETTINGS.quality].name;
-  $('os').textContent = SETTINGS.sound ? 'Ligado' : 'Desligado';
-  $('oi').textContent = SETTINGS.invert ? 'Sim' : 'Não';
-  $('of').textContent = SETTINGS.smoke ? 'Ligada' : 'Desligada';
-  $('oa').textContent = SETTINGS.assist ? 'Ligada' : 'Desligada';
+  $('olang').textContent = LANG === 'pt' ? 'Português' : 'English';
+  $('oq').textContent = i18n('quality.' + SETTINGS.quality);
+  $('os').textContent = i18n(SETTINGS.sound ? 'state.on' : 'state.off');
+  $('oi').textContent = i18n(SETTINGS.invert ? 'state.yes' : 'state.no');
+  $('of').textContent = i18n(SETTINGS.smoke ? 'state.on' : 'state.off');
+  $('oa').textContent = i18n(SETTINGS.assist ? 'state.on' : 'state.off');
   const st = WORLD.genStats || {};
-  $('perfnote').textContent = `Relevo com resolução de ${CELL0} m (${fmt(WORLD.L0.nx * WORLD.L0.nz)} amostras), gerado em ${((st.heights || 0) / 1000).toFixed(1)} s; ${fmt(st.trees || 0)} árvores.`;
+  $('perfnote').textContent = i18n('set.perfnote', { cell: CELL0, samples: fmt(WORLD.L0.nx * WORLD.L0.nz), time: ((st.heights || 0) / 1000).toFixed(1), trees: fmt(st.trees || 0) });
 }
 function applyQuality() {
   const Q = QUALITY_PRESETS[SETTINGS.quality];
@@ -4844,6 +5192,7 @@ function wireUi() {
   click('bhelpclose', () => toggleHelp(false));
   click('bsettings', () => { refreshSettings(); show('settings', true); setTimeout(() => $('bsetclose').focus(), 30); });
   click('bsetclose', () => show('settings', false));
+  click('olang', () => setLang(LANG === 'pt' ? 'en' : 'pt'));
   click('oq', () => { const k = Object.keys(QUALITY_PRESETS); SETTINGS.quality = k[(k.indexOf(SETTINGS.quality) + 1) % k.length]; saveSettings(); applyQuality(); refreshSettings(); });
   click('os', () => { setMute(SETTINGS.sound); refreshSettings(); });
   click('oi', () => { SETTINGS.invert = !SETTINGS.invert; saveSettings(); refreshSettings(); });
@@ -5008,6 +5357,7 @@ function simulateFixed(sec, pitch, roll) {
 // ------------------------------------------------------------ boot
 async function boot() {
   const bar = $('loadbar'), msg = $('loadmsg');
+  applyI18n();
   const progress = (p, text) => { bar.style.width = `${Math.round(p * 100)}%`; if (text) msg.textContent = text; };
   try {
     const test = document.createElement('canvas').getContext('webgl2');
@@ -5016,7 +5366,7 @@ async function boot() {
     applyQuality();
     CAM.mode = SETTINGS.cam || 0;
     await buildWorld(progress);
-    msg.textContent = 'Montando a cena';
+    msg.textContent = i18n('load.scene');
     await nextFrame();
     buildSky();
     R.terrain.push(new TerrainLevel(WORLD.L2, true));
@@ -5056,8 +5406,8 @@ async function boot() {
     const e = $('loaderr');
     e.hidden = false;
     e.textContent = err && err.message === 'webgl2'
-      ? 'Este navegador não liberou WebGL 2. Tente o Chrome, Edge, Firefox ou Safari atualizados, com aceleração de hardware ativada.'
-      : 'Não foi possível montar o mundo 3D: ' + (err && err.message ? err.message : err);
+      ? i18n('error.webgl2')
+      : i18n('error.worldbuild') + (err && err.message ? err.message : err);
     msg.textContent = '';
   }
 }
