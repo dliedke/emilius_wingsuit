@@ -1,6 +1,7 @@
 // ================================================================= AUDIO
 // Everything is synthesized: wind from filtered noise, beeps for the audible
-// altimeter, chimes for the gates, a thump for the canopy opening.
+// altimeter, chimes for the gates, a thump for the canopy opening, whistles
+// from startled choughs.
 const AUDIO = { ctx: null, ready: false, master: null, lastBeepAlt: 1e9, lastProx: 999, whooshT: 0 };
 function initAudio() {
   if (AUDIO.ctx) { if (AUDIO.ctx.state === 'suspended') AUDIO.ctx.resume(); return; }
@@ -112,6 +113,16 @@ function noiseBurst(dur, freq, vol, type = 'lowpass', when = 0, q = 0.8) {
   s.connect(f); f.connect(g); g.connect(AUDIO.master); s.start(t, Math.random()); s.stop(t + dur + 0.05);
   return f;
 }
+// a short whistle that jumps up and slides down (alpine chough call)
+function chirp(f0, f1, dur, vol, when = 0) {
+  if (!AUDIO.ready) return;
+  const ctx = AUDIO.ctx, t = ctx.currentTime + when;
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(f0 * 0.8, t); o.frequency.linearRampToValueAtTime(f0, t + 0.025); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  o.connect(g); g.connect(AUDIO.master); o.start(t); o.stop(t + dur + 0.05);
+}
 function whoosh(v) {
   if (!AUDIO.ready) return;
   const f = noiseBurst(0.5, 600, v, 'bandpass', 0, 1.2);
@@ -131,4 +142,8 @@ const SFX = {
   crash() { noiseBurst(0.9, 180, 1.0, 'lowpass'); noiseBurst(0.5, 1200, 0.3, 'bandpass', 0.02); tone(55, 0.8, 'sine', 0.5); },
   splash() { noiseBurst(1.2, 1600, 0.5, 'bandpass', 0, 0.6); noiseBurst(0.6, 300, 0.4, 'lowpass'); },
   click() { tone(1200, 0.05, 'triangle', 0.05); },
+  birds() {
+    const n = 4 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) chirp(2500 + Math.random() * 900, 1500 + Math.random() * 500, 0.1 + Math.random() * 0.08, 0.03 + Math.random() * 0.02, i * 0.09 + Math.random() * 0.1);
+  },
 };

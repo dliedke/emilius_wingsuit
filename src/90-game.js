@@ -1033,7 +1033,8 @@ function loop(now) {
   updateSpeedLines(cam, (VIS.phase === 'fly' || VIS.phase === 'exit') && camModeNow() !== 3 ? VIS.vel : _g1.set(0, 0, 0), dt);
   updateGates(dt);
   const airborne = VIS.phase === 'fly' || VIS.phase === 'exit' || VIS.phase === 'deploy' || VIS.phase === 'canopy';
-  updateBirds(dt, airborne ? VIS.pos : null);
+  if (BIRDS.mesh) BIRDS.mesh.material.uniforms.uPx.value = 2 * Math.tan(cam.fov * DEG / 2) / Math.max(window.innerHeight, 1);
+  if (updateBirds(dt, airborne ? VIS.pos : null) && st === 'play') SFX.birds();
   // windsock
   if (R.sock) {
     const p = R.sock.geometry.attributes.position, b = R.sockBase, t = U.uTime.value;
