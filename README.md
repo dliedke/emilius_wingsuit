@@ -19,7 +19,7 @@ Inspirado no vídeo [“My Most Breathtaking Wingsuit Flight Ever – Monte Emil
 - **Três tipos de pouso**: um campo no vale principal, uma **plataforma flutuando num lago** (cair na água ao lado dela
   ainda conta como pouso, um "Splash!") ou uma **encosta alta da montanha**, com um refúgio.
 - Estação do ano, linha de neve e de árvores, cor da rocha, posição do sol, vento, névoa e nuvens variam por mundo.
-- Bandos de gralhas-alpinas que se espalham quando você passa perto, e águias girando nas térmicas.
+- Bandos de gralhas-alpinas na frente da saída e ao longo da linha, que se espalham gritando quando você passa perto, e águias girando nas térmicas.
 - Para repetir ou compartilhar um mundo, use o link com a semente (`?seed=12345`); o menu tem um botão
   **Copiar link deste mundo**.
 

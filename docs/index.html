@@ -2912,6 +2912,7 @@ attribute vec4 aP;
 attribute vec4 aQ;
 attribute vec2 aK;
 attribute float aWing;
+uniform float uPx;
 varying vec3 vWorld;
 varying float vKind;
 varying float vUp;
@@ -2932,9 +2933,9 @@ void main() {
   p = vec3(p.x * cb - p.y * sb, p.x * sb + p.y * cb, p.z);
   p = vec3(p.x, p.y * cp - p.z * sp, p.y * sp + p.z * cp);
   p = vec3(p.x * ch - p.z * sh, p.y, p.x * sh + p.z * ch);   // nose (-z) turns to (sin h, 0, -cos h)
-  // stay a few pixels wide far away so the flocks read
+  // never narrower than a few pixels (more for raptors, fewer far away), so the flocks read
   float d = distance(aP.xyz, cameraPosition);
-  float sc = aP.w * max(1.0, d * 0.0035 / aP.w);
+  float sc = max(aP.w, d * uPx * (aK.x > 0.5 ? 13.0 : 8.0) * mix(1.0, 0.45, smoothstep(300.0, 1500.0, d)));
   vec3 wp = aP.xyz + p * sc;
   vWorld = wp;
   vKind = aK.x;
@@ -2952,7 +2953,7 @@ void main() {
   #include <logdepthbuf_fragment>
   vec3 N = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
   if (dot(N, cameraPosition - vWorld) < 0.0) N = -N;
-  vec3 base = vKind > 0.5 ? mix(vec3(0.24, 0.16, 0.09), vec3(0.42, 0.31, 0.19), smoothstep(-0.05, 0.1, vUp)) : vec3(0.035, 0.035, 0.04);
+  vec3 base = vKind > 0.5 ? mix(vec3(0.1, 0.07, 0.045), vec3(0.3, 0.21, 0.13), smoothstep(-0.05, 0.1, vUp)) : vec3(0.035, 0.035, 0.04);
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 lit = base * (uSunCol * (0.25 + 0.75 * ndl) * 0.6 + mix(uGround, uSkyAmb, N.y * 0.5 + 0.5) * 1.1);
   lit = applyFog(lit, vWorld);
@@ -3930,8 +3931,9 @@ function buildGates() {
 }
 
 // ------------------------------------------------------------------ birds
-// Alpine choughs in flocks around the cliffs (they scatter when you pass close)
-// and a few raptors circling in thermals over the summit and the landing.
+// Alpine choughs in flocks in front of the exit and along the line (they scatter,
+// calling, when you pass close) and a few raptors circling in thermals over the
+// line and the landing.
 const BIRDS = { flocks: [], mesh: null, n: 0, aP: null, aQ: null, aK: null };
 function birdGeometry() {
   const P = [], W = [];
@@ -3954,34 +3956,41 @@ function birdGeometry() {
 function buildBirds() {
   const rng = mulberry32(Math.imul(SEED, 97) + 5);
   const rr = (a, b) => a + (b - a) * rng();
-  const S = TC.SUMMIT, G = TC.GATES, LZ = TC.LZ;
+  const G = TC.GATES, LZ = TC.LZ, E = TC.EXIT;
   const specs = [];
-  // choughs around the summit: you see them while standing at the exit
-  specs.push({ kind: 0, c: [S.x + rr(-50, 50), S.h + rr(15, 45), S.z + rr(-170, -80)], R: rr(45, 80), n: 12 + Math.floor(rr(0, 8)) });
-  // flocks beside the line
-  const nLine = 2 + Math.floor(rng() * 3);
-  for (let i = 0; i < nLine; i++) {
-    const k = 1 + Math.floor(rng() * Math.max(1, G.length - 2));
-    const g = G[k], h = G[k - 1];
-    const dx = g[0] - h[0], dz = g[1] - h[1], L = Math.hypot(dx, dz) || 1;
-    const sd = rng() < 0.5 ? -1 : 1, off = rr(70, 160);
-    specs.push({ kind: 0, c: [g[0] - dz / L * sd * off, g[2] + rr(-10, 50), g[1] + dx / L * sd * off], R: rr(35, 70), n: 8 + Math.floor(rr(0, 10)) });
+  // a point beside segment k of the line (exit -> gate 0 -> gate 1 ...), t along it, off to one side
+  const P0 = [E.x, E.z, groundHeight(E.x, E.z)];
+  const beside = (k, t, off, dy) => {
+    const a = k ? G[k - 1] : P0, g = G[k];
+    const dx = g[0] - a[0], dz = g[1] - a[1], L = Math.hypot(dx, dz) || 1, sd = rng() < 0.5 ? -1 : 1;
+    const x = a[0] + dx * t - dz / L * sd * off, z = a[1] + dz * t + dx / L * sd * off;
+    return [x, Math.max(a[2] + (g[2] - a[2]) * t + dy, groundHeight(x, z) + 25), z];
+  };
+  // choughs out in front of the exit, about level with it: you watch them while standing
+  // there, then dive under them
+  {
+    const L0 = Math.hypot(G[0][0] - E.x, G[0][1] - E.z) || 1, c = beside(0, rr(70, 120) / L0, rr(5, 35), 0);
+    c[1] = Math.max(P0[2] + rr(-15, 20), groundHeight(c[0], c[2]) + 25);
+    specs.push({ kind: 0, c, R: rr(25, 40), n: 14 + Math.floor(rr(0, 8)) });
   }
+  // flocks along the line, close enough to fly past (they scatter when you do)
+  const nLine = 3 + Math.floor(rng() * 3);
+  for (let i = 0; i < nLine; i++) specs.push({ kind: 0, c: beside(1 + Math.floor(rng() * (G.length - 1)), rr(0.25, 0.75), rr(15, 70), rr(-10, 30)), R: rr(25, 45), n: 8 + Math.floor(rr(0, 10)) });
   if (TC.TOWERS.length) { const T = TC.TOWERS[Math.floor(rng() * TC.TOWERS.length)]; specs.push({ kind: 0, c: [T[0], T[2] + rr(20, 60), T[1]], R: rr(40, 70), n: 10 + Math.floor(rr(0, 6)) }); }
-  // raptors riding thermals: over the landing (seen under canopy) and near the summit
-  specs.push({ kind: 1, c: [LZ.x + rr(-260, 260), LZ.h + rr(170, 330), LZ.z + rr(-260, 260)], R: rr(70, 120), n: 2 });
-  specs.push({ kind: 1, c: [S.x + rr(-500, 500), S.h + rr(-250, 60), S.z + rr(-700, -250)], R: rr(90, 150), n: 1 + Math.floor(rng() * 2) });
+  // raptors riding thermals: over the landing (seen under canopy) and above the middle of the line
+  { const x = LZ.x + rr(-170, 170), z = LZ.z + rr(-170, 170); specs.push({ kind: 1, c: [x, Math.max(LZ.h + rr(110, 230), groundHeight(x, z) + 70), z], R: rr(55, 90), n: 2 + Math.floor(rng() * 2) }); }
+  specs.push({ kind: 1, c: beside(1 + Math.floor(rng() * (G.length - 1)), rr(0.2, 0.8), rr(60, 140), rr(20, 70)), R: rr(70, 110), n: 1 + Math.floor(rng() * 2) });
   const flocks = [];
   let n = 0;
   for (const sp of specs) {
     const raptor = sp.kind === 1;
-    const F = { kind: sp.kind, cx: sp.c[0], cy: sp.c[1], cz: sp.c[2], R: sp.R, a: rng() * 6.283, w: (raptor ? rr(7, 10) : rr(9, 13)) / sp.R * (rng() < 0.5 ? -1 : 1), bob: rr(5, 18), e: rr(0.6, 1), birds: [], c: new THREE.Vector3() };
+    const F = { kind: sp.kind, cx: sp.c[0], cy: sp.c[1], cz: sp.c[2], R: sp.R, a: rng() * 6.283, w: (raptor ? rr(7, 10) : rr(9, 13)) / sp.R * (rng() < 0.5 ? -1 : 1), bob: rr(5, 18), e: rr(0.6, 1), birds: [], c: new THREE.Vector3(), alarm: false };
     for (let i = 0; i < sp.n; i++) {
-      const off = raptor ? new THREE.Vector3(rr(-40, 40), rr(-25, 25), rr(-40, 40)) : new THREE.Vector3(rr(-14, 14), rr(-6, 6), rr(-14, 14));
+      const off = raptor ? new THREE.Vector3(rr(-40, 40), rr(-25, 25), rr(-40, 40)) : new THREE.Vector3(rr(-24, 24), rr(-8, 8), rr(-24, 24));
       F.birds.push({
         p: new THREE.Vector3(F.cx + off.x, F.cy + off.y, F.cz + off.z), v: new THREE.Vector3(rr(-2, 2), 0, rr(-2, 2)), off,
         ph: rng() * 6.283, rate: raptor ? rr(5, 6.5) : rr(13, 17), flap: raptor ? 0 : 1, scared: 0, bank: 0, hd: 0, pitch: 0,
-        size: raptor ? rr(2.0, 2.5) : rr(0.8, 1.0),
+        size: raptor ? rr(2.8, 3.4) : rr(1.4, 1.7),
       });
       n++;
     }
@@ -3995,7 +4004,8 @@ function buildBirds() {
   geo.instanceCount = n;
   let k = 0;
   for (const F of flocks) for (let i = 0; i < F.birds.length; i++, k++) { BIRDS.aK.array[k * 2] = F.kind; BIRDS.aK.array[k * 2 + 1] = F.kind ? 0.28 : 0.8; }
-  const mat = new THREE.ShaderMaterial({ uniforms: { ...pickU() }, vertexShader: BIRD_VS, fragmentShader: BIRD_FS, side: THREE.DoubleSide });
+  // uPx: radians per screen pixel, so far birds keep a minimum size on screen (set every frame)
+  const mat = new THREE.ShaderMaterial({ uniforms: { ...pickU(), uPx: { value: 0.0015 } }, vertexShader: BIRD_VS, fragmentShader: BIRD_FS, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   R.world.add(mesh);
@@ -4003,12 +4013,14 @@ function buildBirds() {
   updateBirds(0, null);
 }
 const _bt = new THREE.Vector3(), _bd = new THREE.Vector3();
+// returns how many flocks the pilot just startled (for their alarm calls)
 function updateBirds(dt, player) {
-  if (!BIRDS.mesh) return;
+  if (!BIRDS.mesh) return 0;
   const P = BIRDS.aP.array, Q = BIRDS.aQ.array;
-  let k = 0;
+  let k = 0, startled = 0;
   for (const F of BIRDS.flocks) {
     const raptor = F.kind === 1;
+    let fear = 0;
     F.a += dt * F.w;
     F.c.set(F.cx + Math.cos(F.a) * F.R, F.cy + Math.sin(F.a * 0.7) * F.bob, F.cz + Math.sin(F.a) * F.R * F.e);
     for (const b of F.birds) {
@@ -4022,6 +4034,7 @@ function updateBirds(dt, player) {
           if (d < 60 && !raptor) { b.scared = Math.min(1, b.scared + dt * 5); const f = (60 - d) * 2.2 / Math.max(d, 1); acc.x += dx * f; acc.y += Math.abs(dy) * f * 0.6 + 4; acc.z += dz * f; }
         }
         b.scared = Math.max(0, b.scared - dt * 0.2);
+        fear = Math.max(fear, b.scared);
         b.v.addScaledVector(acc, dt);
         const sp = b.v.length(), vmin = raptor ? 8 : 7, vmax = raptor ? 16 : 13 + b.scared * 11;
         if (sp > vmax) b.v.multiplyScalar(vmax / sp); else if (sp < vmin) b.v.multiplyScalar(vmin / Math.max(sp, 0.01));
@@ -4042,8 +4055,10 @@ function updateBirds(dt, player) {
       Q[k * 4] = b.hd; Q[k * 4 + 1] = b.pitch; Q[k * 4 + 2] = b.bank; Q[k * 4 + 3] = b.flap > 0.05 ? b.ph : 0.35;
       k++;
     }
+    if (fear > 0.3 && !F.alarm) { F.alarm = true; startled++; } else if (fear < 0.05) F.alarm = false;
   }
   BIRDS.aP.needsUpdate = true; BIRDS.aQ.needsUpdate = true;
+  return startled;
 }
 
 // ------------------------------------------------------------ smoke trail
@@ -5071,7 +5086,8 @@ function updateCamera(dt, cam, st, mode) {
 // ---- 70-audio.js
 // ================================================================= AUDIO
 // Everything is synthesized: wind from filtered noise, beeps for the audible
-// altimeter, chimes for the gates, a thump for the canopy opening.
+// altimeter, chimes for the gates, a thump for the canopy opening, whistles
+// from startled choughs.
 const AUDIO = { ctx: null, ready: false, master: null, lastBeepAlt: 1e9, lastProx: 999, whooshT: 0 };
 function initAudio() {
   if (AUDIO.ctx) { if (AUDIO.ctx.state === 'suspended') AUDIO.ctx.resume(); return; }
@@ -5183,6 +5199,16 @@ function noiseBurst(dur, freq, vol, type = 'lowpass', when = 0, q = 0.8) {
   s.connect(f); f.connect(g); g.connect(AUDIO.master); s.start(t, Math.random()); s.stop(t + dur + 0.05);
   return f;
 }
+// a short whistle that jumps up and slides down (alpine chough call)
+function chirp(f0, f1, dur, vol, when = 0) {
+  if (!AUDIO.ready) return;
+  const ctx = AUDIO.ctx, t = ctx.currentTime + when;
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(f0 * 0.8, t); o.frequency.linearRampToValueAtTime(f0, t + 0.025); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  o.connect(g); g.connect(AUDIO.master); o.start(t); o.stop(t + dur + 0.05);
+}
 function whoosh(v) {
   if (!AUDIO.ready) return;
   const f = noiseBurst(0.5, 600, v, 'bandpass', 0, 1.2);
@@ -5202,6 +5228,10 @@ const SFX = {
   crash() { noiseBurst(0.9, 180, 1.0, 'lowpass'); noiseBurst(0.5, 1200, 0.3, 'bandpass', 0.02); tone(55, 0.8, 'sine', 0.5); },
   splash() { noiseBurst(1.2, 1600, 0.5, 'bandpass', 0, 0.6); noiseBurst(0.6, 300, 0.4, 'lowpass'); },
   click() { tone(1200, 0.05, 'triangle', 0.05); },
+  birds() {
+    const n = 4 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < n; i++) chirp(2500 + Math.random() * 900, 1500 + Math.random() * 500, 0.1 + Math.random() * 0.08, 0.03 + Math.random() * 0.02, i * 0.09 + Math.random() * 0.1);
+  },
 };
 
 // ---- 80-input.js
@@ -6350,7 +6380,8 @@ function loop(now) {
   updateSpeedLines(cam, (VIS.phase === 'fly' || VIS.phase === 'exit') && camModeNow() !== 3 ? VIS.vel : _g1.set(0, 0, 0), dt);
   updateGates(dt);
   const airborne = VIS.phase === 'fly' || VIS.phase === 'exit' || VIS.phase === 'deploy' || VIS.phase === 'canopy';
-  updateBirds(dt, airborne ? VIS.pos : null);
+  if (BIRDS.mesh) BIRDS.mesh.material.uniforms.uPx.value = 2 * Math.tan(cam.fov * DEG / 2) / Math.max(window.innerHeight, 1);
+  if (updateBirds(dt, airborne ? VIS.pos : null) && st === 'play') SFX.birds();
   // windsock
   if (R.sock) {
     const p = R.sock.geometry.attributes.position, b = R.sockBase, t = U.uTime.value;

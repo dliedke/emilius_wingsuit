@@ -593,6 +593,7 @@ attribute vec4 aP;
 attribute vec4 aQ;
 attribute vec2 aK;
 attribute float aWing;
+uniform float uPx;
 varying vec3 vWorld;
 varying float vKind;
 varying float vUp;
@@ -613,9 +614,9 @@ void main() {
   p = vec3(p.x * cb - p.y * sb, p.x * sb + p.y * cb, p.z);
   p = vec3(p.x, p.y * cp - p.z * sp, p.y * sp + p.z * cp);
   p = vec3(p.x * ch - p.z * sh, p.y, p.x * sh + p.z * ch);   // nose (-z) turns to (sin h, 0, -cos h)
-  // stay a few pixels wide far away so the flocks read
+  // never narrower than a few pixels (more for raptors, fewer far away), so the flocks read
   float d = distance(aP.xyz, cameraPosition);
-  float sc = aP.w * max(1.0, d * 0.0035 / aP.w);
+  float sc = max(aP.w, d * uPx * (aK.x > 0.5 ? 13.0 : 8.0) * mix(1.0, 0.45, smoothstep(300.0, 1500.0, d)));
   vec3 wp = aP.xyz + p * sc;
   vWorld = wp;
   vKind = aK.x;
@@ -633,7 +634,7 @@ void main() {
   #include <logdepthbuf_fragment>
   vec3 N = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
   if (dot(N, cameraPosition - vWorld) < 0.0) N = -N;
-  vec3 base = vKind > 0.5 ? mix(vec3(0.24, 0.16, 0.09), vec3(0.42, 0.31, 0.19), smoothstep(-0.05, 0.1, vUp)) : vec3(0.035, 0.035, 0.04);
+  vec3 base = vKind > 0.5 ? mix(vec3(0.1, 0.07, 0.045), vec3(0.3, 0.21, 0.13), smoothstep(-0.05, 0.1, vUp)) : vec3(0.035, 0.035, 0.04);
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 lit = base * (uSunCol * (0.25 + 0.75 * ndl) * 0.6 + mix(uGround, uSkyAmb, N.y * 0.5 + 0.5) * 1.1);
   lit = applyFog(lit, vWorld);
