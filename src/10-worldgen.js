@@ -302,12 +302,14 @@ function bakeLevel(L, outerHorizon, isFar) {
       snow *= 0.25 + 0.75 * (1 - S[k]);
       snow *= smoothstep(-0.05, 0.3, -nZ + 0.12 + n2 * 0.3);
       snow = clamp(snow * 1.5 - 0.42 + Math.max(0, c2) * 0.008, 0, 1);
+      snow *= smoothstep(140, 320, Math.hypot(x - LZ.x, z - LZ.z));   // keep the landing a meadow
       if (isFar) {   // far giants: glaciers above ~3300 m
         snow = Math.max(snow, smoothstep(SL - 50, SL + 400, hh + n1 * 250) * (1 - smoothstep(0.3, 0.5, slope)));
       }
       // scree / talus: moderate slopes below steep walls, high up
       const scree = smoothstep(0.07, 0.16, slope) * (1 - smoothstep(0.26, 0.36, slope)) * smoothstep(1900 + dTL, 2300 + dTL, hh + n1 * 200) * smoothstep(-8, 12, c2);
-      const wet = 1 - smoothstep(10, 40, dr);
+      const dLand = Math.hypot(x - LZ.x, z - LZ.z);
+      const wet = Math.max(1 - smoothstep(10, 40, dr), (1 - smoothstep(70, 230, dLand)) * (LZ.type === 'mountain' ? 0.9 : 0.5));
       spl[k * 4] = forest * 255 + 0.5;
       spl[k * 4 + 1] = snow * 255 + 0.5;
       spl[k * 4 + 2] = scree * 255 + 0.5;

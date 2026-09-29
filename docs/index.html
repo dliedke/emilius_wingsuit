@@ -203,6 +203,17 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 #btnpause { right: max(22px, var(--safe-r)); top: calc(220px + var(--safe-t)); }
 
 @media (max-height: 640px) { #minimap { display: none; } }
+/* phones in landscape: the menu has to fit in ~390 px of height */
+@media (max-height: 500px) {
+  #menu { justify-content: flex-start; overflow-y: auto; padding-top: calc(12px + var(--safe-t)); padding-bottom: calc(12px + var(--safe-b)); }
+  #menu .col { gap: 7px; }
+  #menu .title { font-size: clamp(40px, 14vh, 64px); }
+  .sub { font-size: 17px; margin-top: 0; }
+  .menu-btns { gap: 2px; margin-top: 2px; }
+  .mbtn { font-size: 21px; padding: 2px 0; }
+  .mbtn.primary { font-size: 30px; }
+  .credit { display: none; }
+}
 @media (max-height: 520px) { .ro:nth-child(4) { display: none; } #camtag { display: none; } }
 /* short viewports (phones in landscape) — the width-based rules below don't catch these,
    so shrink the bottom HUD card here or it eats a big chunk of the little vertical room */
@@ -1179,7 +1190,7 @@ function makeTerrainCore(SEED) {
     const b = a / k;
     pts.push([cx - dir[0] * a * 1.12, cz - dir[1] * a * 1.12, level + 20, b * 0.8, 0.62, 0.00045]);
     pts.push([cx, cz, level + 18, b * 0.8, 0.6, 0.00045]);
-    pts.push([cx + dir[0] * a * 1.06, cz + dir[1] * a * 1.06, level - 4, 26, 0.7, 0.00045]);
+    pts.push([cx + dir[0] * a * 1.06, cz + dir[1] * a * 1.06, level - 1.5, 26, 0.7, 0.00045]);
     const L = { x: cx, z: cz, r: a, k, c: dir[0], s: dir[1], level, depth, valley: VALLEYS.length };
     LAKES.push(L);
     return L;
@@ -1386,6 +1397,7 @@ function makeTerrainCore(SEED) {
   prep(RIDGES, 2, Math.min);
   for (const v of VALLEYS) {
     v.minWall = Math.min(...v.pts.map(p => p[4]));
+    v.minCurv = Math.min(...v.pts.map(p => p[5]));
     v.cum = [0];
     for (let i = 1; i < v.pts.length; i++) v.cum.push(v.cum[i - 1] + Math.hypot(v.pts[i][0] - v.pts[i - 1][0], v.pts[i][1] - v.pts[i - 1][1]));
     v.seed = v.cum.length * 13.1 + v.pts[0][0] * 0.001;
@@ -1396,10 +1408,22 @@ function makeTerrainCore(SEED) {
   // valley profile: floor + wall(e); sets VFLOOR to the winning floor height
   let VFLOOR = 0;
   const GULLY = 1.05;
+  // per-segment scratch, so the gully pattern can blend where segments trade places
+  const SEG_V = new Float64Array(256), SEG_T = new Float64Array(256), SEG_E = new Float64Array(256), SEG_Q = new Float64Array(256), SEG_F = new Float64Array(256);
+  // spurs & gullies running down the walls: noise stretched across the valley axis
+  // (q = signed distance to the segment's line, continuous on both sides of it)
+  function gully(v, i, t, e, q) {
+    let sArc = v.cum[i] + t * (v.cum[i + 1] - v.cum[i]);
+    sArc += 110 * noise(sArc / 420 + v.seed * 0.3, q / 500 + 2.1);
+    const g = noise(sArc / 170 + v.seed, q / 800 + 7.1) + 0.5 * noise(sArc / 64 - v.seed, q / 300 - 3.3);
+    return g * Math.min(e * 0.55, 220) * GULLY;
+  }
   function valleyValue(x, z, v, hNow) {
-    if (v.ext + v.minWall * bbDist(x, z, v.bb) > hNow + v.k) return 1e9;
+    // lower bound of the profile (walls minus the deepest gully) — skip valleys that can't reach us
+    const D = bbDist(x, z, v.bb);
+    if (v.ext + v.minWall * D + v.minCurv * D * D - Math.min(D * 0.87, 346) > hNow + v.k) return 1e9;
     const pts = v.pts, last = pts.length - 2;
-    let best = 1e9, bestF = 0, bi = -1, bt = 0, be = 0, bside = 1;
+    let best = 1e9, vmin = 1e9;
     for (let i = 0; i <= last; i++) {
       const a = pts[i], b = pts[i + 1];
       const ex = b[0] - a[0], ez = b[1] - a[1];
@@ -1419,17 +1443,22 @@ function makeTerrainCore(SEED) {
       const e = d > w ? d - w : 0;
       const u = d < w ? d / w : 1;
       const val = floor + u * u * 4 + s * e + c * e * e + cap * 1.2;
-      if (val < best) { bestF = floor; bi = i; bt = t; be = e; bside = ex * pz - ez * px < 0 ? 1 : -1; }
+      SEG_V[i] = val; SEG_T[i] = t; SEG_E[i] = e; SEG_Q[i] = (ex * pz - ez * px) / Math.sqrt(L2); SEG_F[i] = floor;
+      if (val < vmin) vmin = val;
       best = best > 1e8 ? val : smin(best, val, 50);
     }
-    // spurs & gullies running down the walls: noise stretched across the valley axis
-    if (be > 0 && bi >= 0) {
-      let sArc = v.cum[bi] + bt * (v.cum[bi + 1] - v.cum[bi]);
-      sArc += 110 * noise(sArc / 420 + v.seed * 0.3, be / 500 + bside * 2.1);
-      const g = noise(sArc / 170 + v.seed + bside * 50.3, be / 800 + bside * 7.1) + 0.5 * noise(sArc / 64 - v.seed, be / 300 - bside * 3.3);
-      best += g * Math.min(be * 0.55, 220) * GULLY;
+    // gullies and the floor from every segment within the blend band, weighted like the
+    // smooth min, so nothing jumps where two segments trade places
+    let gs = 0, ws = 0, fs = 0;
+    for (let i = 0; i <= last; i++) {
+      const k = 1 - (SEG_V[i] - vmin) / 50;
+      if (k <= 0) continue;
+      const wk = k * k;
+      if (SEG_E[i] > 0) gs += wk * gully(v, i, SEG_T[i], SEG_E[i], SEG_Q[i]);
+      fs += wk * SEG_F[i]; ws += wk;
     }
-    VFLOOR = bestF;
+    best += gs / ws;
+    VFLOOR = fs / ws;
     return best;
   }
   function ridgeCap(x, z, r, hNow) {
@@ -1498,7 +1527,7 @@ function makeTerrainCore(SEED) {
     if (bbDist(x, z, CORRIDOR.bb) > 900) return CORR_OUT;
     const pts = CORRIDOR.pts;
     let carve = 1e9;
-    let wallW = 0, wallF = -1e9;
+    let wallW = 0, wallAcc = 0, wallSum = 0;
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i + 1];
       const ex = b[0] - a[0], ez = b[1] - a[1];
@@ -1511,27 +1540,31 @@ function makeTerrainCore(SEED) {
       if (d > 900) continue;
       const floor = a[2] + (b[2] - a[2]) * t;
       const w = a[3] + (b[3] - a[3]) * t;
-      const left = ex * pz - ez * px < 0;
-      const s = left ? a[4] + (b[4] - a[4]) * t : a[5] + (b[5] - a[5]) * t;
+      const L = Math.sqrt(L2);
+      const qs = (ex * pz - ez * px) / L;           // signed distance to the segment's line (< 0: left)
+      const side = clamp(0.5 + 1.5 * qs / Math.max(d, 1e-3), 0, 1);   // 0 left, 1 right, blended past the ends
+      const s = mix(a[4] + (b[4] - a[4]) * t, a[5] + (b[5] - a[5]) * t, side);
       const e = Math.max(0, d - w);
       const u = Math.min(d, w) / w;
       let v = floor + u * u * 3 + s * e + 0.0005 * e * e;
       if (e > 0) {
-        const sArc = CORRIDOR.cum[i] + t * Math.sqrt(L2);
-        const g = noise(sArc / 120 + (left ? 3.3 : 71.9), e / 520) + 0.5 * noise(sArc / 48 - 9.1, e / 230 + (left ? 1.7 : 5.3));
+        const sArc = CORRIDOR.cum[i] + t * L;
+        const g = noise(sArc / 120 + 3.3, qs / 520) + 0.5 * noise(sArc / 48 - 9.1, qs / 230 + 1.7);
         v += g * Math.min(e * 0.35, 90);
       }
       carve = carve > 1e8 ? v : smin(carve, v, 45);
-      const wall = (a[6] + (b[6] - a[6]) * t) * (left ? -1 : 1);
-      if (wall > 0.01 && d < 300 && tRaw > 0 && tRaw < 1) {
+      // the traverse face on the wall side, fading out beyond the segment's ends
+      const wall = (a[6] + (b[6] - a[6]) * t) * (side * 2 - 1);
+      if (wall > 0.01 && d < 300) {
+        const along = tRaw * L;
         const q = Math.max(0, d - 30);
         const f = floor + 1.12 * q + 0.0006 * q * q;
-        const ww = wall * (1 - sstep(170, 290, d)) * sstep(20, 45, d);
-        if (ww > wallW) { wallW = ww; wallF = f; }
+        const ww = wall * (1 - sstep(170, 290, d)) * sstep(20, 45, d) * sstep(-70, 0, along) * sstep(L + 70, L, along);
+        if (ww > 0) { wallW = Math.max(wallW, ww); wallAcc += ww * f; wallSum += ww; }
       }
     }
     CORR_OUT[0] = carve;
-    CORR_OUT[1] = wallF;
+    CORR_OUT[1] = wallSum > 0 ? wallAcc / wallSum : -1e9;
     CORR_OUT.wallW = wallW;
     return CORR_OUT;
   }
@@ -1597,17 +1630,19 @@ function makeTerrainCore(SEED) {
     // the towers either side of the notch always stand proud
     for (let i = 0; i < TOWERS.length; i++) {
       const Tw = TOWERS[i], d = Math.hypot(x - Tw[0], z - Tw[1]);
-      if (d < 320) h = Math.max(h, Tw[2] - 1.25 * d);
+      if (d < 320) { const f = Tw[2] - 1.25 * d; if (f > h) h += (f - h) * (1 - sstep(220, 320, d)); }
     }
     { const mv = mainValley(x, z); if (mv < h + 120) h = smin(h, mv, 120); }
 
-    // valley carving (min); remember the floor of the deepest valley nearby
+    // valley carving (min); remember the floor of the deepest valley nearby, easing in
+    // as a valley starts to cut (so the detail below never switches on abruptly)
     let floorNear = h, hBefore = h;
     for (let i = 0; i < VALLEYS.length; i++) {
       const V = VALLEYS[i];
       const v = valleyValue(x, z, V, h);
-      if (v < 1e8) {
-        if (v < h + V.k) { const nh = smin(h, v, V.k); if (v < h) floorNear = VFLOOR; h = nh; }
+      if (v < 1e8 && v < h + V.k) {
+        floorNear = Math.min(floorNear, hBefore + (VFLOOR - hBefore) * sstep(h + V.k, h - 20, v));
+        h = smin(h, v, V.k);
       }
     }
     // ridge caps
@@ -1649,16 +1684,16 @@ function makeTerrainCore(SEED) {
         h = Math.min(h, bed);
       } else {
         const e2 = d - L.r;
-        const bank = L.level + 0.8 + 0.42 * e2 + 0.0006 * e2 * e2 + e * 20 * sstep(40, 200, e2);
+        // (climbs away steeply past ~400 m, so it has let go long before the 700 m cut-off)
+        const far = Math.max(0, e2 - 400);
+        const bank = L.level + 0.8 + 0.42 * e2 + 0.0006 * e2 * e2 + 0.02 * far * far + e * 20 * sstep(40, 200, e2);
         if (bank < h + 30) h = smin(h, bank, 30);
+        // the rim holds the water everywhere but the outlet, straight downstream, where the
+        // valley (and the line, over a lake gate) carries on down past the lip
+        const outlet = L.valley >= 0 ? sstep(0.78, 0.93, ((x - L.x) * L.c + (z - L.z) * L.s) / Math.max(d, 1e-3)) : 0;
         const rim = L.level + 0.8 + 0.25 * e2;
-        if (e2 < 60 && h < rim) h += (rim - h) * (1 - sstep(20, 60, e2));
-        if (e2 < 60) rimGuard = Math.max(rimGuard, L.level + 1);
-      }
-      // outlet: the lake's valley cuts through the rim only where its floor is below the water
-      if (L.valley >= 0 && d < L.r + 260) {
-        const v = valleyValue(x, z, VALLEYS[L.valley], h);
-        if (v < L.level && v < h) h = v;
+        if (e2 < 60 && h < rim) h += (rim - h) * (1 - sstep(20, 60, e2)) * (1 - outlet);
+        if (e2 < 60 && outlet < 0.5) rimGuard = Math.max(rimGuard, L.level + 1);
       }
     }
     // flight corridor: carve the line clear (never through a lake's rim), then build the traverse face
@@ -1688,16 +1723,18 @@ function makeTerrainCore(SEED) {
 
     // ---- decal: landing meadow (valley floor or mountain shelf)
     if (LZ_READY && LZ.type !== 'lake' && dLZ < 330) {
-      const plane = LZ.h + (z - LZ.z) * LZ.tz + (x - LZ.x) * LZ.tx;
-      const r0 = LZ.type === 'mountain' ? 75 : 90, r1 = LZ.type === 'mountain' ? 300 : 310;
-      const w = 1 - sstep(r0, r1, dLZ);
+      const mtn = LZ.type === 'mountain';
+      // a mountain shelf is a small alpine meadow that rolls a little, not a flat pad
+      const roll = mtn ? fbm(x / 70 + 4.1, z / 70 - 2.7, 2, 0.5) * 6 * sstep(35, 110, dLZ) : 0;
+      const plane = LZ.h + (z - LZ.z) * LZ.tz + (x - LZ.x) * LZ.tx + roll;
+      const w = 1 - sstep(mtn ? 50 : 90, mtn ? 210 : 310, dLZ);
       h += (plane - h) * w * w * (3 - 2 * w);
     }
 
     // ---- fine grain (skip on the water and the meadow)
     if (coarse) return h;
     const f = fbm(x / 55 + 1.9, z / 55 - 4.4, 2, 0.5);
-    h += f * (2.5 + 9 * relief) * sstep(18, 60, dSum) * lakeF * (0.3 + 0.7 * sstep(100, 380, dLZ));
+    h += f * (2.5 + 9 * relief) * sstep(18, 60, dSum) * lakeF * (0.3 + 0.7 * (LZ.type === 'mountain' ? sstep(35, 160, dLZ) : sstep(100, 380, dLZ)));
     return h;
   }
 
@@ -1721,12 +1758,16 @@ function makeTerrainCore(SEED) {
   if (LZTYPE === 'mountain') {
     let best = null;
     const ring = [[0, 0], [70, 0], [-70, 0], [0, 70], [0, -70], [50, 50], [-50, -50], [50, -50], [-50, 50]];
-    for (const dt of [-160, -60, 40, 140]) for (let e = 140; e <= 520; e += 45) for (const sg of [-1, 1]) {
+    const outer = [[150, 0], [-150, 0], [0, 150], [0, -150], [106, 106], [-106, -106], [106, -106], [-106, 106]];
+    for (const dt of [-240, -160, -80, 0, 80, 160]) for (let e = 100; e <= 620; e += 40) for (const sg of [-1, 1]) {
       const [cx, cz] = offPt(tL + dt, vOff + sg * e);
-      let sum = 0, mn = 1e9, mx = -1e9;
+      let sum = 0, mn = 1e9, mx = -1e9, mn2 = 1e9, mx2 = -1e9;
       for (const [ox, oz] of ring) { const hh = height(cx + ox, cz + oz, true); sum += hh; if (hh < mn) mn = hh; if (hh > mx) mx = hh; }
       const mean = sum / ring.length;
-      const score = Math.abs(mean - LZH0) + (mx - mn) * 1.6 + Math.abs(dt) * 0.15;
+      for (const [ox, oz] of outer) { const hh = height(cx + ox, cz + oz, true) - mean; if (hh < mn2) mn2 = hh; if (hh > mx2) mx2 = hh; }
+      // near the planned height, flat close in, and gentle out to 150 m (no mesa or pit)
+      const off = Math.abs(mean - LZH0);
+      const score = off * 0.6 + Math.max(0, off - 140) * 3 + (mx - mn) * 1.6 + (mx2 - mn2) * 0.6 + Math.abs(dt) * 0.1;
       if (!best || score < best.score) best = { score, x: cx, z: cz, h: mean };
     }
     LZ.x = best.x; LZ.z = best.z; LZ.h = Math.round(best.h);
@@ -2062,12 +2103,14 @@ function bakeLevel(L, outerHorizon, isFar) {
       snow *= 0.25 + 0.75 * (1 - S[k]);
       snow *= smoothstep(-0.05, 0.3, -nZ + 0.12 + n2 * 0.3);
       snow = clamp(snow * 1.5 - 0.42 + Math.max(0, c2) * 0.008, 0, 1);
+      snow *= smoothstep(140, 320, Math.hypot(x - LZ.x, z - LZ.z));   // keep the landing a meadow
       if (isFar) {   // far giants: glaciers above ~3300 m
         snow = Math.max(snow, smoothstep(SL - 50, SL + 400, hh + n1 * 250) * (1 - smoothstep(0.3, 0.5, slope)));
       }
       // scree / talus: moderate slopes below steep walls, high up
       const scree = smoothstep(0.07, 0.16, slope) * (1 - smoothstep(0.26, 0.36, slope)) * smoothstep(1900 + dTL, 2300 + dTL, hh + n1 * 200) * smoothstep(-8, 12, c2);
-      const wet = 1 - smoothstep(10, 40, dr);
+      const dLand = Math.hypot(x - LZ.x, z - LZ.z);
+      const wet = Math.max(1 - smoothstep(10, 40, dr), (1 - smoothstep(70, 230, dLand)) * (LZ.type === 'mountain' ? 0.9 : 0.5));
       spl[k * 4] = forest * 255 + 0.5;
       spl[k * 4 + 1] = snow * 255 + 0.5;
       spl[k * 4 + 2] = scree * 255 + 0.5;
@@ -2535,6 +2578,7 @@ void main() {
   vec3 scree = mix(cScree, cRockRed * 1.2, 0.3 * smoothstep(0.5, 0.85, nB)) * (0.82 + 0.3 * nC + 0.22 * (nD - 0.5));
   float hT = h - uAlt.x, hS = h - uAlt.y;
   vec3 grass = mix(cMeadow, cGrass, smoothstep(1350.0, 2250.0, hT + (nB - 0.5) * 500.0));
+  grass = mix(grass, cMeadow * (0.85 + 0.3 * nA), sp.a * 0.75);   // lush pasture: river banks, around a landing
   grass *= 0.8 + 0.35 * nC + 0.12 * (nD - 0.5);
   float highW = smoothstep(2050.0, 2550.0, hT + (nB - 0.5) * 500.0);
   float alpineBare = smoothstep(2650.0, 2950.0, hS + (nB - 0.5) * 300.0 + (nC - 0.5) * 120.0);
@@ -3170,6 +3214,7 @@ function terrainMaterial(level, far) {
   const uni = {
     uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSkyZenith: U.uSkyZenith, uSkyHorizon: U.uSkyHorizon, uHaze: U.uHaze,
     uSkyAmb: U.uSkyAmb, uGround: U.uGround, uFogA: U.uFogA, uFogB: U.uFogB, uTime: U.uTime, uNoise: U.uNoise,
+    uRiv0: U.uRiv0, uRiv1: U.uRiv1, uAlt: U.uAlt,
     uHgt: { value: L.hTex }, uNrm: { value: L.nTex }, uSpl: { value: L.sTex },
     uOrigin: { value: new THREE.Vector2(L.x0, L.z0) }, uCell: { value: L.cell }, uDims: { value: new THREE.Vector2(L.nx, L.nz) },
     uSkirt: { value: far ? 180 : 36 }, uIsFar: { value: far ? 1 : 0 },
@@ -3271,6 +3316,7 @@ function pickU() {
   return {
     uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSkyZenith: U.uSkyZenith, uSkyHorizon: U.uSkyHorizon, uHaze: U.uHaze,
     uSkyAmb: U.uSkyAmb, uGround: U.uGround, uFogA: U.uFogA, uFogB: U.uFogB, uTime: U.uTime,
+    uRiv0: U.uRiv0, uRiv1: U.uRiv1, uAlt: U.uAlt,
   };
 }
 
@@ -3632,6 +3678,13 @@ function buildProps() {
     const x = lerp(Ln[k][0], Ln[k + 1][0], t) + Math.cos(a) * r, z = lerp(Ln[k][1], Ln[k + 1][1], t) + Math.sin(a) * r;
     if (!clear(x, z, 25) || splatAt(L0, x, z, 0) > 0.2 || splatAt(L0, x, z, 1) > 0.4) continue;
     places.push([x, z, 5 + rng() * 7, rng()]);
+  }
+  if (LZ.type === 'mountain') {
+    for (let i = 0; i < 70; i++) {
+      const a = rng() * Math.PI * 2, r = 45 + rng() * 170;
+      const x = LZ.x + Math.cos(a) * r, z = LZ.z + Math.sin(a) * r;
+      if (inLevel(L0, x, z)) places.push([x, z, 0.5 + Math.pow(rng(), 2.5) * 3.2, rng()]);
+    }
   }
   const mA = new THREE.InstancedMesh(geoA, rockMat, places.length);
   const mB = new THREE.InstancedMesh(geoB, rockMat2, places.length);
@@ -5670,7 +5723,7 @@ function renderResults() {
     T.className = 'bad';
     why.textContent = i18n(s.crashCause === 'tree' ? 'result.why.tree' : s.crashCause === 'water' ? 'result.why.water' : 'result.why.terrain', { kmh });
   } else {
-    const L = s.landing;
+    const L = s.landing || { kind: 'plf', vs: 0, dist: 0 };
     T.textContent = L.splash ? i18n('land.splash') : { perfect: i18n('land.perfect'), good: i18n('land.good'), plf: i18n('result.title.plf'), hard: i18n('land.hard'), water: i18n('result.title.waterland'), tree: i18n('result.title.treeland') }[L.kind];
     T.className = L.kind === 'perfect' || L.kind === 'good' || L.splash ? 'good' : 'bad';
     why.textContent = L.splash ? i18n('result.why.splash', { dist: Math.round(L.dist) }) : i18n('result.why.landing', { vs: L.vs.toFixed(1), dist: Math.round(L.dist) });

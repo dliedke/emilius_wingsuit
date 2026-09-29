@@ -126,6 +126,7 @@ function terrainMaterial(level, far) {
   const uni = {
     uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSkyZenith: U.uSkyZenith, uSkyHorizon: U.uSkyHorizon, uHaze: U.uHaze,
     uSkyAmb: U.uSkyAmb, uGround: U.uGround, uFogA: U.uFogA, uFogB: U.uFogB, uTime: U.uTime, uNoise: U.uNoise,
+    uRiv0: U.uRiv0, uRiv1: U.uRiv1, uAlt: U.uAlt,
     uHgt: { value: L.hTex }, uNrm: { value: L.nTex }, uSpl: { value: L.sTex },
     uOrigin: { value: new THREE.Vector2(L.x0, L.z0) }, uCell: { value: L.cell }, uDims: { value: new THREE.Vector2(L.nx, L.nz) },
     uSkirt: { value: far ? 180 : 36 }, uIsFar: { value: far ? 1 : 0 },
@@ -227,6 +228,7 @@ function pickU() {
   return {
     uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSkyZenith: U.uSkyZenith, uSkyHorizon: U.uSkyHorizon, uHaze: U.uHaze,
     uSkyAmb: U.uSkyAmb, uGround: U.uGround, uFogA: U.uFogA, uFogB: U.uFogB, uTime: U.uTime,
+    uRiv0: U.uRiv0, uRiv1: U.uRiv1, uAlt: U.uAlt,
   };
 }
 
@@ -588,6 +590,13 @@ function buildProps() {
     const x = lerp(Ln[k][0], Ln[k + 1][0], t) + Math.cos(a) * r, z = lerp(Ln[k][1], Ln[k + 1][1], t) + Math.sin(a) * r;
     if (!clear(x, z, 25) || splatAt(L0, x, z, 0) > 0.2 || splatAt(L0, x, z, 1) > 0.4) continue;
     places.push([x, z, 5 + rng() * 7, rng()]);
+  }
+  if (LZ.type === 'mountain') {
+    for (let i = 0; i < 70; i++) {
+      const a = rng() * Math.PI * 2, r = 45 + rng() * 170;
+      const x = LZ.x + Math.cos(a) * r, z = LZ.z + Math.sin(a) * r;
+      if (inLevel(L0, x, z)) places.push([x, z, 0.5 + Math.pow(rng(), 2.5) * 3.2, rng()]);
+    }
   }
   const mA = new THREE.InstancedMesh(geoA, rockMat, places.length);
   const mB = new THREE.InstancedMesh(geoB, rockMat2, places.length);

@@ -194,6 +194,17 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 #btnpause { right: max(22px, var(--safe-r)); top: calc(220px + var(--safe-t)); }
 
 @media (max-height: 640px) { #minimap { display: none; } }
+/* phones in landscape: the menu has to fit in ~390 px of height */
+@media (max-height: 500px) {
+  #menu { justify-content: flex-start; overflow-y: auto; padding-top: calc(12px + var(--safe-t)); padding-bottom: calc(12px + var(--safe-b)); }
+  #menu .col { gap: 7px; }
+  #menu .title { font-size: clamp(40px, 14vh, 64px); }
+  .sub { font-size: 17px; margin-top: 0; }
+  .menu-btns { gap: 2px; margin-top: 2px; }
+  .mbtn { font-size: 21px; padding: 2px 0; }
+  .mbtn.primary { font-size: 30px; }
+  .credit { display: none; }
+}
 @media (max-height: 520px) { .ro:nth-child(4) { display: none; } #camtag { display: none; } }
 /* short viewports (phones in landscape) — the width-based rules below don't catch these,
    so shrink the bottom HUD card here or it eats a big chunk of the little vertical room */

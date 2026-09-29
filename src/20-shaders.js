@@ -259,6 +259,7 @@ void main() {
   vec3 scree = mix(cScree, cRockRed * 1.2, 0.3 * smoothstep(0.5, 0.85, nB)) * (0.82 + 0.3 * nC + 0.22 * (nD - 0.5));
   float hT = h - uAlt.x, hS = h - uAlt.y;
   vec3 grass = mix(cMeadow, cGrass, smoothstep(1350.0, 2250.0, hT + (nB - 0.5) * 500.0));
+  grass = mix(grass, cMeadow * (0.85 + 0.3 * nA), sp.a * 0.75);   // lush pasture: river banks, around a landing
   grass *= 0.8 + 0.35 * nC + 0.12 * (nD - 0.5);
   float highW = smoothstep(2050.0, 2550.0, hT + (nB - 0.5) * 500.0);
   float alpineBare = smoothstep(2650.0, 2950.0, hS + (nB - 0.5) * 300.0 + (nC - 0.5) * 120.0);

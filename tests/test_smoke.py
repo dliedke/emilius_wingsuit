@@ -14,7 +14,7 @@ async def main():
         logs = []
         pg.on('console', lambda m: logs.append(f'[{m.type}] {m.text}'))
         pg.on('pageerror', lambda e: logs.append(f'[pageerror] {e}'))
-        await pg.goto('http://localhost:8765/local.html', wait_until='domcontentloaded')
+        await pg.goto('http://localhost:8765/local.html?seed=18', wait_until='domcontentloaded')
         await pg.wait_for_function('window.__emilius !== undefined', timeout=240000)
         await pg.evaluate("document.getElementById('menu').hidden = true; document.getElementById('scrim').hidden = true;")
         for n, pos, tgt, fov in VIEWS:

@@ -406,7 +406,7 @@ function renderResults() {
     T.className = 'bad';
     why.textContent = i18n(s.crashCause === 'tree' ? 'result.why.tree' : s.crashCause === 'water' ? 'result.why.water' : 'result.why.terrain', { kmh });
   } else {
-    const L = s.landing;
+    const L = s.landing || { kind: 'plf', vs: 0, dist: 0 };
     T.textContent = L.splash ? i18n('land.splash') : { perfect: i18n('land.perfect'), good: i18n('land.good'), plf: i18n('result.title.plf'), hard: i18n('land.hard'), water: i18n('result.title.waterland'), tree: i18n('result.title.treeland') }[L.kind];
     T.className = L.kind === 'perfect' || L.kind === 'good' || L.splash ? 'good' : 'bad';
     why.textContent = L.splash ? i18n('result.why.splash', { dist: Math.round(L.dist) }) : i18n('result.why.landing', { vs: L.vs.toFixed(1), dist: Math.round(L.dist) });
