@@ -6,8 +6,9 @@ const WS = {
   cdTab: [0.16, 0.15, 0.15, 0.162, 0.178, 0.212, 0.265, 0.36, 0.47, 0.68],
   aMin: 3, aTrim: 12, aMax: 21, bankMax: 70 * DEG,
 };
-const WIND = new THREE.Vector3(1.4, 0, 0.5);   // light WSW breeze in the valley
+const WIND = new THREE.Vector3(1.4, 0, 0.5);   // valley breeze (set per world)
 const G = 9.81;
+const FUEL_TIME = 30;                            // seconds of full thrust from the paramotor
 function tab(xs, ys, x) {
   if (x <= xs[0]) return ys[0];
   for (let i = 0; i < xs.length - 1; i++) if (x <= xs[i + 1]) return lerp(ys[i], ys[i + 1], (x - xs[i]) / (xs[i + 1] - xs[i]));
@@ -20,11 +21,12 @@ const SIM = {
   alpha: 12, bank: 0, heading: 0, inflate: 0,
   deployT: 0, openShock: 0,
   u: 0, w: 0, yawRate: 0, flare: 0, toggleL: 0, toggleR: 0, swingRoll: 0, swingPitch: 0,
+  thrust: 0, fuel: 1,
   quat: new THREE.Quaternion(), liftDir: new THREE.Vector3(0, 1, 0),
   agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0,
   outcome: null, crashCause: null, landing: null,
 };
-const INPUT = { pitch: 0, roll: 0, brakeL: 0, brakeR: 0, deploy: false, jump: false };
+const INPUT = { pitch: 0, roll: 0, brakeL: 0, brakeR: 0, thrust: 0, deploy: false, jump: false };
 
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _m4 = new THREE.Matrix4();
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -133,30 +135,34 @@ function stepCanopy(dt, inp) {
   const s = SIM;
   s.toggleL = damp(s.toggleL, clamp(inp.brakeL, 0, 1), 7, dt);
   s.toggleR = damp(s.toggleR, clamp(inp.brakeR, 0, 1), 7, dt);
+  // paramotor: pushes the wing faster and holds (or gains) height while the fuel lasts
+  s.thrust = damp(s.thrust, s.fuel > 0 ? clamp(inp.thrust || 0, 0, 1) : 0, 5, dt);
+  if (s.thrust > 0.01) s.fuel = Math.max(0, s.fuel - s.thrust * dt / FUEL_TIME);
+  const th = s.thrust;
   const brake = Math.min(s.toggleL, s.toggleR);
   const turn = s.toggleR - s.toggleL;
   const front = Math.max(0, -inp.pitch);
-  const uT = lerp(11.2, 3.8, Math.pow(brake, 0.85)) + front * 2.6;
+  const uT = lerp(11.2, 3.8, Math.pow(brake, 0.85)) + front * 2.6 + th * 4.5;
   const uPrev = s.u;
   s.u = damp(s.u, uT, 1.35, dt);
   const dec = Math.max(0, (uPrev - s.u) / dt);
   s.flare = damp(s.flare, dec * 1.2, 2.6, dt);
   const stall = brake > 0.93 ? (brake - 0.93) * 16 : 0;
-  const wSteady = lerp(4.8, 2.7, smoothstep(0, 0.7, brake)) + stall + Math.abs(turn) * 3.4 * (s.u / 11) + front * 1.9;
-  s.w = damp(s.w, Math.max(0.15, wSteady - s.flare), 2.4, dt);
+  const wSteady = lerp(4.8, 2.7, smoothstep(0, 0.7, brake)) + stall + Math.abs(turn) * 3.4 * (s.u / 11) + front * 1.9 - th * 5.9;
+  s.w = damp(s.w, Math.max(th > 0.05 ? -1.5 : 0.15, wSteady - s.flare), 2.4, dt);
   s.yawRate = damp(s.yawRate, turn * 1.1 * (0.35 + 0.65 * s.u / 11), 2.3, dt);
   s.heading = wrapAngle(s.heading + s.yawRate * dt);
   s.vel.set(Math.sin(s.heading) * s.u + WIND.x, -s.w, -Math.cos(s.heading) * s.u + WIND.z);
   s.pos.addScaledVector(s.vel, dt);
   s.swingRoll = damp(s.swingRoll, s.yawRate * s.u * 0.085, 2.0, dt);
-  s.swingPitch = damp(s.swingPitch, s.flare * 0.07 - front * 0.12 + (s.toggleL + s.toggleR) * 0.05, 2.6, dt);
+  s.swingPitch = damp(s.swingPitch, s.flare * 0.07 - front * 0.12 + (s.toggleL + s.toggleR) * 0.05 - th * 0.1, 2.6, dt);
   s.gLoad = 1;
 }
 
 // distance to terrain in all directions (not just straight down)
 const PROX_R = [3, 6, 10, 15, 22, 32, 46, 64];
 function proximity(p) {
-  const g0 = groundHeight(p.x, p.z);
+  const g0 = surfaceHeight(p.x, p.z);
   let best = p.y - g0;
   for (let k = 0; k < 12; k++) {
     const a = k / 12 * Math.PI * 2;
@@ -164,7 +170,7 @@ function proximity(p) {
     let prevR = 0, prevDh = p.y - g0;
     for (const r of PROX_R) {
       if (r > best * 1.05) break;
-      const h = groundHeight(p.x + cx * r, p.z + cz * r);
+      const h = surfaceHeight(p.x + cx * r, p.z + cz * r);
       const dh = p.y - h;
       if (dh <= 0) {   // a wall: crossing between prevR and r
         const f = prevDh / Math.max(1e-3, prevDh - dh);
@@ -202,11 +208,11 @@ const ASSIST_INP = { pitch: 0, roll: 0 };
 // 0..1: how soon the current path meets the ground (for the auto pull-up)
 function groundDanger(s) {
   let d = 0;
-  const agl = s.pos.y - groundHeight(s.pos.x, s.pos.z);
+  const agl = s.pos.y - surfaceHeight(s.pos.x, s.pos.z);
   if (agl < 6) d = 1 - agl / 6 * 0.5;
   for (const t of [0.35, 0.7, 1.05, 1.4, 1.8]) {
     const x = s.pos.x + s.vel.x * t, y = s.pos.y + s.vel.y * t, z = s.pos.z + s.vel.z * t;
-    if (y - groundHeight(x, z) < 4) { d = Math.max(d, 1 - t / 2.1); break; }
+    if (y - surfaceHeight(x, z) < 4) { d = Math.max(d, 1 - t / 2.1); break; }
   }
   return d;
 }
@@ -261,11 +267,13 @@ function physicsStep(dt) {
   }
   // collisions
   if (s.phase === 'exit' || s.phase === 'fly' || s.phase === 'deploy' || s.phase === 'canopy') {
-    const g = groundHeight(s.pos.x, s.pos.z);
+    const g0 = groundHeight(s.pos.x, s.pos.z);
+    const g = onPlatform(s.pos.x, s.pos.z) ? Math.max(g0, TC.LZ.h) : g0;
     const feet = s.phase === 'canopy' ? 1.02 : 0.28;
     const water = isWater(s.pos.x, s.pos.z);
-    const wl = water === 'lake' ? TC.LAKE.level : water === 'river' ? TC.mainFloor(s.pos.x) - 0.9 : -1e9;
+    const wl = water ? waterLevel(s.pos.x, s.pos.z) : -1e9;
     const floor = Math.max(g, wl);
+    s.agl = s.pos.y - feet - floor;
     s.scrapeCool = Math.max(0, (s.scrapeCool || 0) - dt);
     const grace = (s.phase === 'exit' || s.phase === 'fly') && s.airT < 4.5;
     const assisted = SETTINGS.assist && (s.phase === 'exit' || s.phase === 'fly');
@@ -293,8 +301,8 @@ function crash(cause) {
 function land(water, g) {
   const s = SIM;
   const vs = Math.max(0, -s.vel.y), hs = Math.hypot(s.vel.x, s.vel.z);
-  const nx = (groundHeight(s.pos.x + 2, s.pos.z) - groundHeight(s.pos.x - 2, s.pos.z)) / 4;
-  const nz = (groundHeight(s.pos.x, s.pos.z + 2) - groundHeight(s.pos.x, s.pos.z - 2)) / 4;
+  const nx = (surfaceHeight(s.pos.x + 2, s.pos.z) - surfaceHeight(s.pos.x - 2, s.pos.z)) / 4;
+  const nz = (surfaceHeight(s.pos.x, s.pos.z + 2) - surfaceHeight(s.pos.x, s.pos.z - 2)) / 4;
   const slope = Math.hypot(nx, nz);
   let kind;
   if (water === 'tree') kind = 'tree';
@@ -303,16 +311,38 @@ function land(water, g) {
   else if (vs < 1.9 && hs < 7) kind = 'perfect';
   else if (vs < 3.1) kind = 'good';
   else kind = 'plf';
-  s.landing = { kind, vs, hs, slope, dist: Math.hypot(s.pos.x - TC.LZ.x, s.pos.z - TC.LZ.z) };
+  const dist = Math.hypot(s.pos.x - TC.LZ.x, s.pos.z - TC.LZ.z);
+  // in a lake world, missing the platform means a swim next to it — still a landing
+  const splash = kind === 'water' && water === 'lake' && TC.LZ.type === 'lake' && dist < 160;
+  s.landing = { kind, vs, hs, slope, dist, splash };
   s.phase = 'landed'; s.phaseT = 0;
-  s.outcome = (kind === 'hard' || kind === 'tree' || kind === 'water') ? 'bad' : 'landed';
+  s.outcome = (kind === 'hard' || kind === 'tree' || (kind === 'water' && !splash)) ? 'bad' : 'landed';
+  s.thrust = 0;
   s.vel.set(0, 0, 0);
   EVENTS.push({ type: 'land', kind });
 }
 
 // ------------------------------------------------------------ autopilot
 // Flies the line: used for the menu's attract mode and the tests.
-const AUTO = { on: false, gate: 0 };
+const AUTO = { on: false, gate: 0, hold: null };
+// where to burn height before the final: over the lowest ground next to the target
+// (so a mountain shelf's slope is never in the way), a little downwind if possible
+function holdingPoint() {
+  const LZ = TC.LZ, wl = Math.hypot(WIND.x, WIND.z);
+  let best = null;
+  for (let k = 0; k < 16; k++) {
+    const a = k / 16 * Math.PI * 2, cx = Math.sin(a), cz = -Math.cos(a);
+    const hx = LZ.x + cx * 150, hz = LZ.z + cz * 150;
+    // the final leg must stay under a 2.6:1 glide into the target, and the circle around the point must be clear
+    let worst = -1e9;
+    for (const r of [50, 100, 150]) worst = Math.max(worst, surfaceHeight(LZ.x + cx * r, LZ.z + cz * r) - (LZ.h + r / 2.6));
+    for (let q = 0; q < 10; q++) { const b = q / 10 * Math.PI * 2; worst = Math.max(worst, surfaceHeight(hx + Math.cos(b) * 90, hz + Math.sin(b) * 90) - (LZ.h + 150 / 2.6)); }
+    const down = wl > 0.3 ? (cx * WIND.x + cz * WIND.z) / wl : 0;
+    const score = worst - down * 12;
+    if (!best || score < best.score) best = { score, x: hx, z: hz, dir: k % 2 ? 1 : -1 };
+  }
+  return best;
+}
 function autopilot(inp, gates, dt) {
   const s = SIM;
   inp.deploy = false;
@@ -328,6 +358,7 @@ function autopilot(inp, gates, dt) {
       const lead = clamp((dg - 60) * 0.35, 0, 70);
       tx = g.x - g.n.x * lead; ty = g.y - g.n.y * lead - 2; tz = g.z - g.n.z * lead;
     } else { tx = TC.LZ.x; tz = TC.LZ.z; ty = TC.LZ.h + 300; }
+    const alz = s.pos.y - TC.LZ.h;
     const dx = tx - s.pos.x, dz = tz - s.pos.z, dh = Math.hypot(dx, dz);
     const herr = wrapAngle(Math.atan2(dx, -dz) - s.heading);
     inp.roll = clamp(herr * 2.6 - s.bank * 0.25, -1, 1);
@@ -352,26 +383,42 @@ function autopilot(inp, gates, dt) {
         s.vel.x += ax * dt; s.vel.y += ay * dt; s.vel.z += az * dt;
       }
     }
-    if (!g && (s.agl < 290 || (dh < 600 && s.agl < 420))) inp.deploy = true;
+    if (!g && (s.agl < 260 || alz < 400 || (dh < 650 && alz < 470))) inp.deploy = true;
   } else if (s.phase === 'canopy') {
-    // canopy pattern: S-turns to burn height, orbit the field, final approach, flare
+    // canopy pattern: head for a holding point over open ground beside the target,
+    // burn height circling it, then a straight final (motor if short) and the flare
     const LZ = TC.LZ;
+    if (!AUTO.hold) AUTO.hold = holdingPoint();
+    const H = AUTO.hold;
     const dx = LZ.x - s.pos.x, dz = LZ.z - s.pos.z, dh = Math.hypot(dx, dz);
     const alt = s.pos.y - 1.02 - LZ.h;
-    const reach = alt * 2.2;
-    const bearing = Math.atan2(dx - WIND.x * 3, -(dz - WIND.z * 3));
+    const into = (WIND.x * dx + WIND.z * dz) / Math.max(1, dh);   // tailwind toward the target
+    const reach = alt / 4.8 * (11.2 + into);
+    const need = dh * 4.8 / Math.max(4, 11.2 + into) + 10;       // height for a straight glide in
+    const toLZ = Math.atan2(dx - WIND.x * 3, -(dz - WIND.z * 3));
+    const hx = H.x - s.pos.x, hz = H.z - s.pos.z, dH = Math.hypot(hx, hz);
+    const toH = Math.atan2(hx - WIND.x * 3, -(hz - WIND.z * 3));
     AUTO.cT = (AUTO.cT || 0) + dt;
-    let desired = bearing;
-    if (dh > 200) {
-      if (reach - dh > 260) desired = bearing + (Math.floor(AUTO.cT / 6.5) % 2 ? 1 : -1) * 1.2;
-    } else if (alt > 85) {
-      desired = bearing + 1.65;   // orbit around the target
+    let desired = toLZ;
+    if (alt > need + 8) {
+      if (dH > 160) desired = toH + (reach - dh > 320 ? (Math.floor(AUTO.cT / 6.5) % 2 ? 1 : -1) * 0.9 : 0);
+      else desired = toH + H.dir * clamp(1.57 - (dH - 70) * 0.02, 0.6, 2.2);   // circle the holding point, ~70 m out
     }
     const herr = wrapAngle(desired - s.heading);
     const t = clamp(herr * 1.0, -0.85, 0.85);
+    // on final, hold the glide slope: front risers steepen it when high, the motor stretches it when low
+    let high = false, low = false;
+    if (desired === toLZ && dh > 25) {
+      const vH = Math.max(2, (s.vel.x * dx + s.vel.z * dz) / dh);
+      // aim short: the flare carries the canopy another ~15 m
+      const excess = alt - Math.max(0.3, -s.vel.y) * Math.max(0, dh - 16) / vH;
+      high = excess > 3; low = excess < -2;
+    }
     inp.brakeL = t < 0 ? -t : 0; inp.brakeR = t > 0 ? t : 0;
-    inp.pitch = 0;
-    const feet = s.pos.y - 1.02 - groundHeight(s.pos.x, s.pos.z);
-    if (feet < 4.2) { inp.brakeL = inp.brakeR = clamp(1.45 - feet / 3.6, 0.3, 1); }
-  } else { inp.pitch = 0; inp.roll = 0; inp.brakeL = inp.brakeR = 0; }
+    inp.pitch = high ? -1 : 0;
+    // motor on when the field is out of reach
+    inp.thrust = s.fuel > 0 && dh > 25 && (reach < dh * 1.08 || low) ? 1 : 0;
+    const feet = s.pos.y - 1.02 - surfaceHeight(s.pos.x, s.pos.z);
+    if (feet < 4.2) { inp.brakeL = inp.brakeR = clamp(1.45 - feet / 3.6, 0.3, 1); inp.thrust = 0; }
+  } else { inp.pitch = 0; inp.roll = 0; inp.brakeL = inp.brakeR = 0; inp.thrust = 0; }
 }

@@ -3,7 +3,7 @@ const KEYS = new Set();
 const IN = {
   pitch: 0, roll: 0, bl: 0, br: 0,
   joy: { id: null, ox: 0, oy: 0, x: 0, y: 0 },
-  actionHeld: false, touchAction: false,
+  actionHeld: false, touchAction: false, touchThrust: false,
   gpPrev: [],
 };
 function initInput(onKey, onAction) {
@@ -43,6 +43,16 @@ function initInput(onKey, onAction) {
   act.addEventListener('touchend', (e) => { e.preventDefault(); IN.touchAction = false; }, { passive: false });
   act.addEventListener('mousedown', () => { IN.touchAction = true; onAction(); });
   act.addEventListener('mouseup', () => { IN.touchAction = false; });
+  // hold for the canopy's motor
+  const thr = $('btnthr');
+  const thrOn = (e) => { e.preventDefault(); IN.touchThrust = true; thr.classList.add('on'); };
+  const thrOff = (e) => { e.preventDefault(); IN.touchThrust = false; thr.classList.remove('on'); };
+  thr.addEventListener('touchstart', thrOn, { passive: false });
+  thr.addEventListener('touchend', thrOff, { passive: false });
+  thr.addEventListener('touchcancel', thrOff, { passive: false });
+  thr.addEventListener('mousedown', thrOn);
+  thr.addEventListener('mouseup', thrOff);
+  thr.addEventListener('mouseleave', thrOff);
 }
 function axisRamp(cur, target, dt) {
   const rate = Math.abs(target) > Math.abs(cur) && Math.sign(target) === Math.sign(cur || target) ? 3.2 : 6.5;
@@ -54,7 +64,8 @@ function pollGamepad(onButton) {
   for (const gp of pads) {
     if (!gp || !gp.connected) continue;
     const dz = (v) => (Math.abs(v) < 0.14 ? 0 : (v - Math.sign(v) * 0.14) / 0.86);
-    const res = { x: dz(gp.axes[0] || 0), y: dz(gp.axes[1] || 0), lt: gp.buttons[6] ? gp.buttons[6].value : 0, rt: gp.buttons[7] ? gp.buttons[7].value : 0, a: gp.buttons[0] && gp.buttons[0].pressed };
+    const pressed = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const res = { x: dz(gp.axes[0] || 0), y: dz(gp.axes[1] || 0), lt: gp.buttons[6] ? gp.buttons[6].value : 0, rt: gp.buttons[7] ? gp.buttons[7].value : 0, a: pressed(0), thr: pressed(5) || pressed(2) };
     gp.buttons.forEach((b, i) => { const was = IN.gpPrev[i]; if (b.pressed && !was) onButton(i); IN.gpPrev[i] = b.pressed; });
     return res;
   }
@@ -91,5 +102,7 @@ function readControls(dt, phase, gp) {
   }
   IN.bl = damp(IN.bl, bl, 12, dt); IN.br = damp(IN.br, br, 12, dt);
   INPUT.brakeL = IN.bl; INPUT.brakeR = IN.br;
+  // canopy motor: E or Shift, the MOTOR button, RB / X on a gamepad
+  INPUT.thrust = KEYS.has('KeyE') || KEYS.has('ShiftLeft') || KEYS.has('ShiftRight') || IN.touchThrust || (gp && gp.thr) ? 1 : 0;
   if (phase === 'canopy') { INPUT.pitch = up ? -1 : 0; if (gp && gp.y < -0.5) INPUT.pitch = -1; if (IN.joy.id !== null && IN.joy.y < -0.5) INPUT.pitch = -1; }
 }

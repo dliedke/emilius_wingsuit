@@ -1,15 +1,31 @@
 // ================================================================== SCENE
 const R = {
   renderer: null, scene: null, camera: null, clock: null,
-  terrain: [], trees: [], clouds: [], gates: [], water: [],
+  world: null,   // everything that belongs to the current world (rebuilt for a new one)
+  terrain: [], trees: [], clouds: [], gates: [], water: [], cloudClusters: [],
   frustum: new THREE.Frustum(), projScreen: new THREE.Matrix4(),
 };
-const PAL = {
+const PAL_BASE = {
   rock: 0x7d7872, rock2: 0x5f5b57, rockRed: 0x7f6150, scree: 0x9c8f7d, grass: 0x8c874f, meadow: 0x5c8a35,
   forest: 0x2f4527, snow: 0xf2f5f8, field1: 0x6f9a3f, field2: 0x9aa556, field3: 0x7c8a3c, road: 0x5b5a57,
-  spruce: 0x345a31, larch: 0x62843a, leaf: 0x578532, trunk: 0x3b2c22,
+  spruce: 0x345a31, larch: 0x62843a, leaf: 0x578532, trunk: 0x3b2c22, boulder: 0x8a8279, boulder2: 0x8c7462,
 };
+// rock types and seasons recolour the world
+const PAL_ROCKS = {
+  grey: {},
+  warm: { rock: 0x86796b, rock2: 0x675c52, rockRed: 0x8f6148, scree: 0xa39079, boulder: 0x8f8274, boulder2: 0x94735c },
+  dark: { rock: 0x6c6964, rock2: 0x514e4b, rockRed: 0x6f5849, scree: 0x898176, boulder: 0x73706b, boulder2: 0x79695c },
+  pale: { rock: 0x98938a, rock2: 0x78746c, rockRed: 0x8d7a67, scree: 0xaaa190, boulder: 0xa29d94, boulder2: 0x9a8a78 },
+};
+const PAL_SEASONS = {
+  summer: {},
+  autumn: { grass: 0xa08c50, meadow: 0x7f8a3e, larch: 0xc99a34, leaf: 0xb9722e, field1: 0x8e9444, field2: 0xb3a35e, field3: 0x94873f },
+  spring: { grass: 0x7f9a4a, meadow: 0x5d9a38, larch: 0x7aa04a, leaf: 0x66a03a, field1: 0x72a842, field2: 0x8fb458 },
+};
+let PAL = { ...PAL_BASE };
 const col = (hex, s = 1) => new THREE.Color(hex).multiplyScalar(s);
+// textures shared by every world (never disposed with one)
+const KEEP_TEX = new Set();
 
 function initRenderer() {
   const canvas = $('c');
@@ -31,6 +47,49 @@ function initRenderer() {
   const hemi = new THREE.HemisphereLight(0xa9c8ee, 0x7a6f5c, 1.05);
   R.scene.add(hemi);
   U.uNoise.value = makeNoiseTexture(256);
+  KEEP_TEX.add(U.uNoise.value);
+}
+
+// light, colours, wind and the river for the current world
+function applyStyle() {
+  const st = STYLE;
+  sunVector(st.sunAz, st.sunEl, SUN_DIR);
+  U.uSunDir.value.copy(SUN_DIR);
+  const warm = 1 - smoothstep(18 * DEG, 46 * DEG, st.sunEl);
+  const sunTint = new THREE.Color(0xfff0dc).lerp(new THREE.Color(0xffc68c), warm * 0.55);
+  U.uSunCol.value.copy(sunTint).multiplyScalar(3.3 - warm * 0.25);
+  U.uSkyHorizon.value.set(0xb9d2ea).lerp(new THREE.Color(0xe9d2b4), warm * 0.35);
+  U.uHaze.value.set(0xc6d4e1).lerp(new THREE.Color(0xe8d4bf), warm * 0.4);
+  U.uFogA.value = 0.000085 * st.haze;
+  if (R.sunLight) { R.sunLight.position.copy(SUN_DIR).multiplyScalar(1000); R.sunLight.color.copy(sunTint); }
+  WIND.set(st.wind[0], 0, st.wind[1]);
+  const V = TC.RIV;
+  U.uRiv0.value.set(V.z0, V.a1, V.p1, V.f1);
+  U.uRiv1.value.set(V.a2, V.p2, V.f2, 0);
+  U.uAlt.value.set(st.treeLine - 2060, st.snowLine - 3020, 0, 0);
+  PAL = Object.assign({}, PAL_BASE, PAL_ROCKS[st.rocks], PAL_SEASONS[st.season]);
+}
+
+// free the GPU side of the current world before building the next one
+function disposeWorld() {
+  if (!R.world) return;
+  R.scene.remove(R.world);
+  const geos = new Set(), mats = new Set(), texs = new Set();
+  R.world.traverse((o) => {
+    if (o.geometry) geos.add(o.geometry);
+    if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) mats.add(m);
+  });
+  for (const m of mats) {
+    for (const k in m) { const v = m[k]; if (v && v.isTexture) texs.add(v); }
+    if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k] && m.uniforms[k].value; if (v && v.isTexture) texs.add(v); }
+    m.dispose();
+  }
+  for (const g of geos) g.dispose();
+  for (const t of texs) if (!KEEP_TEX.has(t)) t.dispose();
+  R.world = null;
+  R.terrain = []; R.trees = []; R.water = []; R.gates = []; R.cloudClusters = [];
+  R.treeMat = null; R.sock = null; R.smoke = null; R.prop = null;
+  BIRDS.flocks = []; BIRDS.mesh = null;
 }
 
 // ---------------------------------------------------------- terrain (LOD)
@@ -67,6 +126,7 @@ function terrainMaterial(level, far) {
   const uni = {
     uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSkyZenith: U.uSkyZenith, uSkyHorizon: U.uSkyHorizon, uHaze: U.uHaze,
     uSkyAmb: U.uSkyAmb, uGround: U.uGround, uFogA: U.uFogA, uFogB: U.uFogB, uTime: U.uTime, uNoise: U.uNoise,
+    uRiv0: U.uRiv0, uRiv1: U.uRiv1, uAlt: U.uAlt,
     uHgt: { value: L.hTex }, uNrm: { value: L.nTex }, uSpl: { value: L.sTex },
     uOrigin: { value: new THREE.Vector2(L.x0, L.z0) }, uCell: { value: L.cell }, uDims: { value: new THREE.Vector2(L.nx, L.nz) },
     uSkirt: { value: far ? 180 : 36 }, uIsFar: { value: far ? 1 : 0 },
@@ -117,7 +177,7 @@ class TerrainLevel {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.frustumCulled = false;
       mesh.matrixAutoUpdate = false;
-      R.scene.add(mesh);
+      R.world.add(mesh);
       this.lods.push({ mesh, attr, arr, geo, mat });
     }
   }
@@ -168,30 +228,36 @@ function pickU() {
   return {
     uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSkyZenith: U.uSkyZenith, uSkyHorizon: U.uSkyHorizon, uHaze: U.uHaze,
     uSkyAmb: U.uSkyAmb, uGround: U.uGround, uFogA: U.uFogA, uFogB: U.uFogB, uTime: U.uTime,
+    uRiv0: U.uRiv0, uRiv1: U.uRiv1, uAlt: U.uAlt,
   };
 }
 
 // ------------------------------------------------------------------ water
 function buildWater() {
-  const L0 = WORLD.L0, LK = TC.LAKE;
-  const mk = (river) => new THREE.ShaderMaterial({
+  const L0 = WORLD.L0;
+  const mk = (river, L) => new THREE.ShaderMaterial({
     uniforms: {
       ...pickU(), uNoise: U.uNoise, uHgt: { value: L0.hTex }, uOrigin: { value: new THREE.Vector2(L0.x0, L0.z0) },
-      uCell: { value: L0.cell }, uDims: { value: new THREE.Vector2(L0.nx, L0.nz) }, uLevel: { value: LK.level },
+      uCell: { value: L0.cell }, uDims: { value: new THREE.Vector2(L0.nx, L0.nz) }, uLevel: { value: L ? L.level : 0 },
       uRiver: { value: river ? 1 : 0 }, cDeep: { value: col(river ? 0x2e5d63 : 0x0a5f6c) }, cShallow: { value: col(river ? 0x6f9f98 : 0x39c6bc) },
+      uLake: { value: new THREE.Vector4(L ? L.x : 0, L ? L.z : 0, L ? L.r : 0, L ? L.k : 1) }, uLakeDir: { value: new THREE.Vector2(L ? L.c : 1, L ? L.s : 0) },
+      uLZ: MARKS.lz, uPred: MARKS.pred, uPredCol: MARKS.predCol,
     },
     vertexShader: WATER_VS, fragmentShader: WATER_FS, transparent: true,
   });
-  // lake
-  const lg = new THREE.CircleGeometry(LK.r + 40, 128);
-  lg.rotateX(-Math.PI / 2);
-  lg.scale(1, 1, 1 / LK.sz);
-  const lake = new THREE.Mesh(lg, mk(false));
-  lake.position.set(LK.x, LK.level, LK.z);
-  lake.renderOrder = 2;
-  R.scene.add(lake);
-  R.water.push(lake);
-  // river ribbon along the valley
+  // lakes: ellipses along their valley, faded at the shore by the shader
+  for (const L of TC.LAKES) {
+    const lg = new THREE.CircleGeometry(L.r + 14, 96);
+    lg.rotateX(-Math.PI / 2);
+    lg.scale(1, 1, 1 / L.k);
+    const lake = new THREE.Mesh(lg, mk(false, L));
+    lake.position.set(L.x, L.level, L.z);
+    lake.rotation.y = -Math.atan2(L.s, L.c);
+    lake.renderOrder = 2;
+    R.world.add(lake);
+    R.water.push(lake);
+  }
+  // river ribbon along the main valley (it ducks under nothing: lakes sit in side valleys)
   const pos = [], idx = [];
   const L2 = WORLD.L2;
   let n = 0;
@@ -211,10 +277,10 @@ function buildWater() {
   const rg = new THREE.BufferGeometry();
   rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   rg.setIndex(idx);
-  const river = new THREE.Mesh(rg, mk(true));
+  const river = new THREE.Mesh(rg, mk(true, null));
   river.frustumCulled = false;
   river.renderOrder = 2;
-  R.scene.add(river);
+  R.world.add(river);
   R.water.push(river);
 }
 
@@ -269,7 +335,7 @@ function buildTrees() {
   const CS = 512;
   const gx = Math.ceil((L0.x1 - L0.x0) / CS), gz = Math.ceil((L0.z1 - L0.z0) / CS);
   const buckets = new Map();
-  const rng = mulberry32(777);
+  const rng = mulberry32(Math.imul(SEED, 7) + 777);
   for (let t = 0; t < T.count; t++) {
     const x = tr[t * 6], z = tr[t * 6 + 2], kind = tr[t * 6 + 5];
     const key = (clamp(Math.floor((z - L0.z0) / CS), 0, gz - 1) * gx + clamp(Math.floor((x - L0.x0) / CS), 0, gx - 1)) * 2 + (kind > 1.5 ? 1 : 0);
@@ -312,7 +378,7 @@ function buildTrees() {
       g.instanceCount = n;
       const m = new THREE.Mesh(g, mat);
       m.frustumCulled = false; m.matrixAutoUpdate = false;
-      R.scene.add(m);
+      R.world.add(m);
       return m;
     };
     R.trees.push({
@@ -373,35 +439,43 @@ function cloudTexture() {
   t.colorSpace = THREE.NoColorSpace;
   return t;
 }
+let CLOUD_TEX = null;
+// cloud clusters around this world: mist by the exit, banks off the line, far fields
+function cloudClusters() {
+  const rng = mulberry32(Math.imul(SEED, 13) + 55);
+  const rr = (a, b) => a + (b - a) * rng();
+  const S = TC.SUMMIT, G = TC.GATES, amt = STYLE.clouds;
+  const out = [];   // [x, y, z, radiusX, radiusY, puffs, puffSize]
+  const side = rng() < 0.5 ? -1 : 1;
+  out.push([side * rr(220, 320), S.h - rr(100, 160), rr(-80, 40), 260, 70, 34, 95]);   // mist beside the exit, like the video
+  if (rng() < 0.7) out.push([-side * rr(420, 620), S.h - rr(60, 160), rr(120, 300), 240, 70, 26, 100]);
+  // banks beside the flight, well clear of the line
+  const nMid = Math.round(rr(3, 6) * amt);
+  for (let i = 0; i < nMid; i++) {
+    const g = G[Math.floor(rng() * G.length)];
+    const sd = rng() < 0.5 ? -1 : 1, off = rr(900, 1700);
+    const rx = rr(420, 700);
+    out.push([g[0] + sd * off, g[2] + rr(250, 650), g[1] + rr(-300, 300), rx, rx * 0.24, Math.round(rr(24, 32)), rr(180, 240)]);
+  }
+  // far fields
+  const nFar = Math.round(rr(6, 10) * amt);
+  for (let i = 0; i < nFar; i++) {
+    const a = rng() * Math.PI * 2, d = rr(4200, 16000);
+    const rx = rr(900, 2200);
+    out.push([Math.cos(a) * d, rr(3500, 4800), -3000 + Math.sin(a) * d, rx, rx * 0.2, Math.round(rr(24, 30)), rr(320, 800)]);
+  }
+  return out;
+}
 function buildClouds() {
-  const tex = cloudTexture();
+  if (!CLOUD_TEX) { CLOUD_TEX = cloudTexture(); KEEP_TEX.add(CLOUD_TEX); }
   const mat = new THREE.ShaderMaterial({
-    uniforms: { ...pickU(), uTex: { value: tex } },
+    uniforms: { ...pickU(), uTex: { value: CLOUD_TEX } },
     vertexShader: CLOUD_VS, fragmentShader: CLOUD_FS, transparent: true, depthWrite: false,
   });
   const quad = new THREE.PlaneGeometry(1, 1);
-  const rng = mulberry32(55);
+  const rng = mulberry32(Math.imul(SEED, 3) + 55);
   const Q = QUALITY_PRESETS[SETTINGS.quality];
-  // [x, y, z, radiusX, radiusY, puffs, puffSize]
-  const clusters = [
-    [260, 3420, -40, 260, 70, 34, 95],      // mist beside the exit, like the video
-    [520, 3260, -520, 200, 60, 22, 85],
-    [-520, 3480, 180, 240, 70, 26, 100],
-    [-1900, 3350, -2600, 520, 140, 30, 190],
-    [2700, 3550, -1900, 600, 150, 32, 210],
-    [-700, 3950, -3900, 700, 160, 30, 240],
-    [3300, 3750, -4300, 650, 150, 28, 220],
-    [600, 4250, -7300, 900, 200, 30, 300],
-    [-4200, 3650, -1200, 900, 220, 30, 320],
-    [5200, 3900, -2600, 900, 220, 28, 320],
-    [-3000, 3300, 2500, 800, 200, 26, 300],
-    [2200, 3500, 2800, 800, 200, 26, 300],
-    [-9000, 4200, -8000, 1800, 350, 26, 700],
-    [9500, 4400, -7000, 1800, 380, 26, 700],
-    [1500, 4600, -16000, 2200, 400, 26, 800],
-    [-12000, 4800, 3000, 2200, 400, 24, 800],
-    [12000, 4500, 5000, 2200, 400, 24, 800],
-  ];
+  const clusters = cloudClusters();
   R.cloudClusters = [];
   for (const [x, y, z, rx, ry, n0, ps] of clusters) {
     const n = Math.max(6, Math.round(n0 * Q.clouds));
@@ -426,7 +500,7 @@ function buildClouds() {
     m.position.set(x, y, z);   // for transparent sorting only (shader uses world attrs)
     m.renderOrder = 5;
     m.onBeforeRender = () => {}; // keep position out of the shader
-    R.scene.add(m);
+    R.world.add(m);
     R.cloudClusters.push({ mesh: m, x, y, z, rx, ry, aPuff, n, g });
   }
 }
@@ -471,7 +545,7 @@ function rockGeometry(seed, detail = 1) {
   return g;
 }
 function buildProps() {
-  const S = TC.SUMMIT, E = TC.EXIT;
+  const S = TC.SUMMIT, E = TC.EXIT, LZ = TC.LZ, L0 = WORLD.L0;
   // summit cross
   const metal = stdMat({ color: 0x2b2d30, roughness: 0.55, metalness: 0.7 });
   const cross = new THREE.Group();
@@ -480,12 +554,12 @@ function buildProps() {
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 0.5, 8), stdMat({ color: 0x6b645c, roughness: 1 })); base.position.y = 0.2; cross.add(base);
   cross.position.set(S.x + 7, groundHeight(S.x + 7, S.z + 6) - 0.1, S.z + 6);
   cross.rotation.y = 0.5;
-  R.scene.add(cross);
-  // rocks: summit blocks, exit ledge, scree boulders
-  const rockMat = stdMat({ color: 0x8a8279, roughness: 0.95, flatShading: true });
-  const rockMat2 = stdMat({ color: 0x8c7462, roughness: 0.95, flatShading: true });
+  R.world.add(cross);
+  // rocks: summit blocks, exit ledge, scree boulders along the line, a few huge erratics
+  const rockMat = stdMat({ color: PAL.boulder, roughness: 0.95, flatShading: true });
+  const rockMat2 = stdMat({ color: PAL.boulder2, roughness: 0.95, flatShading: true });
   const geoA = rockGeometry(3, 1), geoB = rockGeometry(9, 1);
-  const rng = mulberry32(8080);
+  const rng = mulberry32(Math.imul(SEED, 11) + 8080);
   const places = [];
   // summit crest blocks (not on the exit path)
   for (let i = 0; i < 46; i++) {
@@ -496,44 +570,63 @@ function buildProps() {
     if (z < E.z) continue;                                                  // nothing on the face itself
     places.push([x, z, 0.45 + rng() * 1.3, rng()]);
   }
-  // scree boulders around the cirque and the notch
-  for (let i = 0; i < 420; i++) {
-    const x = -500 + rng() * 1300, z = -1900 + rng() * 1700;
-    const Lk = lakeDist(x, z);
-    if (Lk < TC.LAKE.r + 8) continue;
-    const sp = splatAt(WORLD.L0, x, z, 2);
-    if (sp < 0.15 && rng() > 0.25) continue;
+  // scree boulders on the slopes the line flies past
+  const Ln = TC.LINE;
+  const clear = (x, z, pad) => inLevel(L0, x, z) && !TC.lakeAt(x, z, pad) && Math.hypot(x - LZ.x, z - LZ.z) > 70 + pad;
+  for (let i = 0; i < 1500; i++) {
+    const k = Math.floor(rng() * (Ln.length - 1)), t = rng();
+    const a = rng() * Math.PI * 2, r = 25 + Math.pow(rng(), 0.7) * 560;
+    const x = lerp(Ln[k][0], Ln[k + 1][0], t) + Math.cos(a) * r, z = lerp(Ln[k][1], Ln[k + 1][1], t) + Math.sin(a) * r;
+    if (!clear(x, z, 8)) continue;
+    const sc = splatAt(L0, x, z, 2), fo = splatAt(L0, x, z, 0), sn = splatAt(L0, x, z, 1);
+    if (fo > 0.35 || sn > 0.55) continue;
+    if (sc < 0.15 && rng() > 0.22) continue;
     places.push([x, z, 0.6 + Math.pow(rng(), 3) * 5, rng()]);
+  }
+  // erratics: house-sized boulders left on meadows and lake shores
+  for (let i = 0; i < 60; i++) {
+    const k = Math.floor(rng() * (Ln.length - 1)), t = rng();
+    const a = rng() * Math.PI * 2, r = 80 + rng() * 700;
+    const x = lerp(Ln[k][0], Ln[k + 1][0], t) + Math.cos(a) * r, z = lerp(Ln[k][1], Ln[k + 1][1], t) + Math.sin(a) * r;
+    if (!clear(x, z, 25) || splatAt(L0, x, z, 0) > 0.2 || splatAt(L0, x, z, 1) > 0.4) continue;
+    places.push([x, z, 5 + rng() * 7, rng()]);
+  }
+  if (LZ.type === 'mountain') {
+    for (let i = 0; i < 70; i++) {
+      const a = rng() * Math.PI * 2, r = 45 + rng() * 170;
+      const x = LZ.x + Math.cos(a) * r, z = LZ.z + Math.sin(a) * r;
+      if (inLevel(L0, x, z)) places.push([x, z, 0.5 + Math.pow(rng(), 2.5) * 3.2, rng()]);
+    }
   }
   const mA = new THREE.InstancedMesh(geoA, rockMat, places.length);
   const mB = new THREE.InstancedMesh(geoB, rockMat2, places.length);
   const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
   let na = 0, nb = 0;
-  for (const [x, z, s, r] of places) {
+  for (const [x, z, sz, r] of places) {
     q.setFromEuler(new THREE.Euler(rng() * 0.4, rng() * 6.28, rng() * 0.4));
-    sc.set(s * (0.8 + rng() * 0.5), s * (0.6 + rng() * 0.5), s * (0.8 + rng() * 0.5));
-    ps.set(x, groundHeight(x, z) + s * 0.15, z);
+    sc.set(sz * (0.8 + rng() * 0.5), sz * (0.6 + rng() * 0.5), sz * (0.8 + rng() * 0.5));
+    ps.set(x, groundHeight(x, z) + sz * 0.15, z);
     mtx.compose(ps, q, sc);
     if (r < 0.7) mA.setMatrixAt(na++, mtx); else mB.setMatrixAt(nb++, mtx);
   }
   mA.count = na; mB.count = nb;
-  R.scene.add(mA); R.scene.add(mB);
+  R.world.add(mA); R.world.add(mB);
   // exit ledge: a flat slab jutting over the north face
   const slab = new THREE.Mesh(rockGeometry(21, 2), rockMat);
   slab.scale.set(1.2, 0.45, 1.6);
   slab.rotation.y = 0.3;
   const gy = groundHeight(E.x, E.z + 1.5);
   slab.position.set(E.x, gy - 0.3, E.z - 0.3);
-  R.scene.add(slab);
+  R.world.add(slab);
   R.exitY = gy + 0.12;
 
   buildLandingZone();
   buildVillages();
 }
-function buildLandingZone() {
-  const LZ = TC.LZ;
-  const gy = groundHeight(LZ.x, LZ.z);
-  // target: painted rings on the meadow
+let TARGET_TEX = null;
+function targetTexture() {
+  if (TARGET_TEX) return TARGET_TEX;
+  // target: painted rings
   const cv = document.createElement('canvas'); cv.width = cv.height = 512;
   const g = cv.getContext('2d');
   const rings = ['#ff6b1a', '#f4f1ea', '#ff6b1a', '#f4f1ea', '#ff6b1a'];
@@ -543,18 +636,42 @@ function buildLandingZone() {
   const img = g.getImageData(0, 0, 512, 512);
   for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) if (Math.hypot(x - 256, y - 256) > 250) img.data[(y * 512 + x) * 4 + 3] = 0;
   g.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  TARGET_TEX = new THREE.CanvasTexture(cv); TARGET_TEX.colorSpace = THREE.SRGBColorSpace; TARGET_TEX.anisotropy = 8;
+  KEEP_TEX.add(TARGET_TEX);
+  return TARGET_TEX;
+}
+function buildLandingZone() {
+  const LZ = TC.LZ;
+  const lake = LZ.type === 'lake';
+  const gy = lake ? LZ.h : groundHeight(LZ.x, LZ.z);
+  const tex = targetTexture();
+  if (lake) {
+    // floating platform: a timber deck on pontoons, ringed by buoys
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(LZ.plat, LZ.plat + 0.3, 1.1, 48), stdMat({ color: 0x8c6b4c, roughness: 0.9 }));
+    deck.position.set(LZ.x, LZ.h - 0.55, LZ.z);
+    R.world.add(deck);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(LZ.plat + 0.35, 0.45, 8, 64), stdMat({ color: 0x2b2f33, roughness: 0.8 }));
+    rim.rotation.x = Math.PI / 2; rim.position.set(LZ.x, LZ.h - 0.75, LZ.z);
+    R.world.add(rim);
+    const buoyMat = stdMat({ color: 0xff6b1a, emissive: 0xff3a00, emissiveIntensity: 0.25, roughness: 0.6 });
+    const buoys = new THREE.InstancedMesh(new THREE.SphereGeometry(0.7, 12, 8), buoyMat, 16);
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; m.makeTranslation(LZ.x + Math.cos(a) * (LZ.plat + 9), LZ.h - 0.6, LZ.z + Math.sin(a) * (LZ.plat + 9)); buoys.setMatrixAt(i, m); }
+    R.world.add(buoys);
+  }
   const disk = new THREE.Mesh(new THREE.CircleGeometry(TARGET_R, 64), stdMat({ map: tex, transparent: true, roughness: 0.9, emissive: 0xff5a10, emissiveMap: tex, emissiveIntensity: 0.35, polygonOffset: true, polygonOffsetFactor: -4, depthWrite: false }));
   disk.rotation.x = -Math.PI / 2;
-  disk.position.set(LZ.x, gy + 0.12, LZ.z);
-  R.scene.add(disk);
+  disk.position.set(LZ.x, gy + (lake ? 0.04 : 0.12), LZ.z);
+  R.world.add(disk);
   MARKS.lz.value.set(LZ.x, LZ.z, 40, 1);
-  buildLzSmoke(LZ.x - 9, groundHeight(LZ.x - 9, LZ.z + 24), LZ.z + 24);
-  // windsock
+  // smoke flare and windsock: on the deck's edge, or on the meadow beside the target
+  const sx = lake ? LZ.x - 13 : LZ.x - 9, sz = lake ? LZ.z + 13 : LZ.z + 24;
+  buildLzSmoke(sx, lake ? LZ.h : groundHeight(sx, sz), sz);
+  const wx = lake ? LZ.x + 15 : LZ.x + 26, wz = lake ? LZ.z - 12 : LZ.z - 14;
+  const wy = lake ? LZ.h : groundHeight(wx, wz);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 6, 8), stdMat({ color: 0xdddddd, roughness: 0.4, metalness: 0.6 }));
-  const wx = LZ.x + 26, wz = LZ.z - 14;
-  pole.position.set(wx, groundHeight(wx, wz) + 3, wz);
-  R.scene.add(pole);
+  pole.position.set(wx, wy + 3, wz);
+  R.world.add(pole);
   const cv2 = document.createElement('canvas'); cv2.width = 256; cv2.height = 16;
   const g2 = cv2.getContext('2d');
   for (let i = 0; i < 5; i++) { g2.fillStyle = i % 2 ? '#f4f1ea' : '#ff6b1a'; g2.fillRect(i * 51.2, 0, 51.2, 16); }
@@ -562,10 +679,36 @@ function buildLandingZone() {
   const sockGeo = new THREE.CylinderGeometry(0.42, 0.16, 2.6, 16, 8, true);
   sockGeo.rotateZ(Math.PI / 2); sockGeo.translate(1.3, 0, 0);
   const sock = new THREE.Mesh(sockGeo, stdMat({ map: t2, side: THREE.DoubleSide, roughness: 0.8 }));
-  sock.position.set(wx, groundHeight(wx, wz) + 5.8, wz);
-  R.scene.add(sock);
+  sock.position.set(wx, wy + 5.8, wz);
+  R.world.add(sock);
   R.sock = sock; R.sockBase = sockGeo.attributes.position.array.slice();
+  if (LZ.type === 'mountain') buildHut();
   R.lzY = gy;
+}
+// mountain landings: an alpine hut and its flag at the edge of the shelf
+function buildHut() {
+  const LZ = TC.LZ;
+  const rng = mulberry32(Math.imul(SEED, 5) + 99);
+  let best = null;
+  for (let i = 0; i < 24; i++) {
+    const a = rng() * Math.PI * 2, r = 42 + rng() * 22;
+    const x = LZ.x + Math.cos(a) * r, z = LZ.z + Math.sin(a) * r;
+    const y = groundHeight(x, z), rough = Math.abs(groundHeight(x + 6, z + 6) - y) + Math.abs(groundHeight(x - 6, z + 6) - y);
+    if (!best || rough < best.rough) best = { x, z, y, rough, a };
+  }
+  const hut = new THREE.Mesh(houseGeometry(), stdMat({ vertexColors: true, color: 0xc9c0b3, roughness: 0.9 }));
+  hut.scale.set(13, 7, 9);
+  hut.position.set(best.x, best.y - 1.2, best.z);
+  hut.rotation.y = best.a + Math.PI / 2;
+  R.world.add(hut);
+  const fx = best.x + Math.cos(best.a) * 10, fz = best.z + Math.sin(best.a) * 10, fy = groundHeight(fx, fz);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 9, 8), stdMat({ color: 0xd8d8d8, roughness: 0.5, metalness: 0.5 }));
+  pole.position.set(fx, fy + 4.5, fz);
+  R.world.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), stdMat({ color: 0xd4202a, roughness: 0.8, side: THREE.DoubleSide }));
+  flag.position.set(fx + 1.2, fy + 8.2, fz);
+  flag.rotation.y = -Math.atan2(WIND.z, WIND.x);
+  R.world.add(flag);
 }
 const TARGET_R = 18;
 // orange smoke from a ground flare next to the target: marks the spot and shows the wind
@@ -588,11 +731,11 @@ function buildLzSmoke(x, y, z) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 5;
-  R.scene.add(mesh);
+  R.world.add(mesh);
   // the flare canister itself
   const can = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.35, 10), stdMat({ color: 0xff6b1a, emissive: 0xff3a00, emissiveIntensity: 1.5 }));
   can.position.set(x, y + 0.18, z);
-  R.scene.add(can);
+  R.world.add(can);
   R.smoke = mesh;
 }
 function houseGeometry() {
@@ -624,32 +767,41 @@ function houseGeometry() {
   return out;
 }
 function buildVillages() {
-  const rng = mulberry32(2024);
-  // [x, z, radius, count] — villages at the foot of the massif, a town down the valley
-  const spots = [
-    [1650, -5150, 170, 26], [820, -5300, 150, 20], [2350, -5250, 180, 24], [-150, -5250, 140, 16],
-    [-900, -5600, 260, 60], [-2300, -5950, 520, 220], [-3500, -6100, 420, 140], [3300, -5500, 200, 30],
-    [4400, -5750, 260, 50], [600, -6400, 220, 36], [2000, -6500, 200, 28], [1300, -3900, 60, 5], [300, -4450, 70, 6],
-  ];
+  const rng = mulberry32(Math.imul(SEED, 17) + 2024);
+  const LZ = TC.LZ;
+  // [x, z, radius, count] — villages strung along the main river, a town somewhere down the valley
+  const spots = [];
+  const town = Math.floor(rng() * 6);
+  for (let i = 0; i < 12; i++) {
+    const x = LZ.x + (i - 5.5) * 1300 + (rng() - 0.5) * 700;
+    const side = rng() < 0.5 ? -1 : 1;
+    const z = TC.riverZ(x) + side * (160 + rng() * 380);
+    const big = i === town + 3;
+    const rad = big ? 380 + rng() * 180 : 110 + rng() * 170;
+    spots.push([x, z, rad, big ? 180 : Math.round(rad * rad / 1300)]);
+  }
+  // a hamlet near a valley landing
+  if (LZ.type === 'valley') spots.push([LZ.x + (rng() < 0.5 ? -1 : 1) * (320 + rng() * 150), LZ.z + (rng() - 0.5) * 200, 150, 22]);
   const list = [];
   for (const [cx, cz, rad, n] of spots) {
-    for (let i = 0; i < n * 3 && list.length < 2000; i++) {
-      if (list.filter((h) => h.v === cx).length >= n) break;
+    let placed = 0;
+    for (let i = 0; i < n * 3 && list.length < 2000 && placed < n; i++) {
       const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * rad;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
       const dr = z - TC.riverZ(x);
       if (Math.abs(dr) < 45) continue;
       if (Math.abs(dr + 380 - 60 * Math.sin(x / 1400)) < 10 || Math.abs(dr - 260 - 40 * Math.sin(x / 2100)) < 13) continue;
-      if (Math.hypot(x - TC.LZ.x, z - TC.LZ.z) < 140) continue;
+      if (Math.hypot(x - LZ.x, z - LZ.z) < 140 || TC.lakeAt(x, z, 30)) continue;
       const y = groundHeight(x, z);
       const y2 = groundHeight(x + 6, z + 6);
-      if (Math.abs(y2 - y) > 4) continue;
-      list.push({ x, y, z, v: cx, w: 7 + rng() * 7, d: 8 + rng() * 9, h: 5 + rng() * (Math.abs(cx + 2300) < 900 ? 9 : 4), rot: Math.round(rng() * 4) * Math.PI / 2 + (rng() - 0.5) * 0.3 });
+      if (Math.abs(y2 - y) > 4 || y > TC.F0 + 260) continue;
+      list.push({ x, y, z, w: 7 + rng() * 7, d: 8 + rng() * 9, h: 5 + rng() * (rad > 300 ? 9 : 4), rot: Math.round(rng() * 4) * Math.PI / 2 + (rng() - 0.5) * 0.3 });
+      placed++;
     }
   }
   const geo = houseGeometry();
   const mat = stdMat({ vertexColors: true, roughness: 0.85 });
-  const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+  const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, list.length));
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   list.forEach((hs, i) => {
     q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), hs.rot);
@@ -657,32 +809,153 @@ function buildVillages() {
     m.compose(p, q, s);
     mesh.setMatrixAt(i, m);
   });
+  mesh.count = list.length;
   mesh.frustumCulled = false;
-  R.scene.add(mesh);
+  R.world.add(mesh);
   WORLD.houses = list;
 }
 
 // ------------------------------------------------------------------ gates
-const GATE_ORANGE = new THREE.Color(0xff6b1a), GATE_WHITE = new THREE.Color(0xf4f1ea), GATE_LAKE = new THREE.Color(0x3fd0c4);
+// kinds: 0 gate, 1 the notch between the towers, 2 over a lake's lip, 3 gold (small)
+const GATE_ORANGE = new THREE.Color(0xff6b1a), GATE_WHITE = new THREE.Color(0xf4f1ea), GATE_LAKE = new THREE.Color(0x3fd0c4), GATE_GOLD = new THREE.Color(0xffc21f);
+const GATE_POINTS = [250, 750, 500, 500];
+function gateColor(kind) { return kind === 2 ? GATE_LAKE : kind === 3 ? GATE_GOLD : GATE_ORANGE; }
 function buildGates() {
   const G = TC.GATES;
   const pts = [[TC.EXIT.x, TC.EXIT.z, R.exitY], ...G.map((g) => [g[0], g[1], g[2]]), [TC.LZ.x, TC.LZ.z, TC.LZ.h]];
   G.forEach((g, i) => {
-    const [x, z, y, r] = g;
+    const [x, z, y, r, kind] = g;
     const prev = pts[i], next = pts[i + 2];
     const dir = new THREE.Vector3(next[0] - prev[0], (next[2] - prev[2]) * 0.3, next[1] - prev[1]).normalize();
-    const geo = new THREE.TorusGeometry(r, i === 3 ? 0.42 : 0.5, 10, 96);
+    const geo = new THREE.TorusGeometry(r, kind === 1 ? 0.42 : kind === 3 ? 0.38 : 0.5, 10, 96);
     const mat = new THREE.ShaderMaterial({
-      uniforms: { ...pickU(), uColA: { value: GATE_ORANGE.clone().multiplyScalar(1.2) }, uColB: { value: GATE_WHITE.clone() }, uGlow: { value: 0.3 }, uFade: { value: 1 } },
+      uniforms: { ...pickU(), uColA: { value: gateColor(kind).clone().multiplyScalar(1.2) }, uColB: { value: GATE_WHITE.clone() }, uGlow: { value: 0.3 }, uFade: { value: 1 } },
       vertexShader: GATE_VS, fragmentShader: GATE_FS, transparent: true, depthWrite: false,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     mesh.lookAt(x + dir.x, y + dir.y, z + dir.z);
     mesh.renderOrder = 6;
-    R.scene.add(mesh);
-    R.gates.push({ mesh, mat, x, y, z, r, n: dir, state: 0, t: 0, notch: i === 3 });
+    R.world.add(mesh);
+    R.gates.push({ mesh, mat, x, y, z, r, n: dir, state: 0, t: 0, kind, notch: kind === 1, col: gateColor(kind) });
   });
+}
+
+// ------------------------------------------------------------------ birds
+// Alpine choughs in flocks around the cliffs (they scatter when you pass close)
+// and a few raptors circling in thermals over the summit and the landing.
+const BIRDS = { flocks: [], mesh: null, n: 0, aP: null, aQ: null, aK: null };
+function birdGeometry() {
+  const P = [], W = [];
+  const tri = (a, b, c, wa, wb, wc) => { P.push(...a, ...b, ...c); W.push(wa, wb, wc); };
+  // body: a slim double pyramid, nose forward (-z)
+  const nose = [0, 0, -0.3], tail = [0, 0, 0.26], l = [-0.05, 0, 0], r = [0.05, 0, 0], up = [0, 0.04, -0.02], dn = [0, -0.035, 0];
+  tri(nose, l, up, 0, 0, 0); tri(nose, up, r, 0, 0, 0); tri(nose, dn, l, 0, 0, 0); tri(nose, r, dn, 0, 0, 0);
+  tri(tail, up, l, 0, 0, 0); tri(tail, r, up, 0, 0, 0); tri(tail, l, dn, 0, 0, 0); tri(tail, dn, r, 0, 0, 0);
+  tri([0, 0, 0.2], [-0.09, 0, 0.42], [0.09, 0, 0.42], 0, 0, 0);   // tail fan
+  // wings: inner panel to the wrist, swept outer panel to the tip
+  for (const sg of [-1, 1]) {
+    const a = [sg * 0.04, 0, -0.1], b = [sg * 0.04, 0, 0.1], c = [sg * 0.26, 0, 0.12], d = [sg * 0.26, 0, -0.08], e = [sg * 0.5, 0, 0.07];
+    tri(a, b, c, 0, 0, 1); tri(a, c, d, 0, 1, 1); tri(d, c, e, 1, 1, 2);
+  }
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('aWing', new THREE.Float32BufferAttribute(W, 1));
+  return g;
+}
+function buildBirds() {
+  const rng = mulberry32(Math.imul(SEED, 97) + 5);
+  const rr = (a, b) => a + (b - a) * rng();
+  const S = TC.SUMMIT, G = TC.GATES, LZ = TC.LZ;
+  const specs = [];
+  // choughs around the summit: you see them while standing at the exit
+  specs.push({ kind: 0, c: [S.x + rr(-50, 50), S.h + rr(15, 45), S.z + rr(-170, -80)], R: rr(45, 80), n: 12 + Math.floor(rr(0, 8)) });
+  // flocks beside the line
+  const nLine = 2 + Math.floor(rng() * 3);
+  for (let i = 0; i < nLine; i++) {
+    const k = 1 + Math.floor(rng() * Math.max(1, G.length - 2));
+    const g = G[k], h = G[k - 1];
+    const dx = g[0] - h[0], dz = g[1] - h[1], L = Math.hypot(dx, dz) || 1;
+    const sd = rng() < 0.5 ? -1 : 1, off = rr(70, 160);
+    specs.push({ kind: 0, c: [g[0] - dz / L * sd * off, g[2] + rr(-10, 50), g[1] + dx / L * sd * off], R: rr(35, 70), n: 8 + Math.floor(rr(0, 10)) });
+  }
+  if (TC.TOWERS.length) { const T = TC.TOWERS[Math.floor(rng() * TC.TOWERS.length)]; specs.push({ kind: 0, c: [T[0], T[2] + rr(20, 60), T[1]], R: rr(40, 70), n: 10 + Math.floor(rr(0, 6)) }); }
+  // raptors riding thermals: over the landing (seen under canopy) and near the summit
+  specs.push({ kind: 1, c: [LZ.x + rr(-260, 260), LZ.h + rr(170, 330), LZ.z + rr(-260, 260)], R: rr(70, 120), n: 2 });
+  specs.push({ kind: 1, c: [S.x + rr(-500, 500), S.h + rr(-250, 60), S.z + rr(-700, -250)], R: rr(90, 150), n: 1 + Math.floor(rng() * 2) });
+  const flocks = [];
+  let n = 0;
+  for (const sp of specs) {
+    const raptor = sp.kind === 1;
+    const F = { kind: sp.kind, cx: sp.c[0], cy: sp.c[1], cz: sp.c[2], R: sp.R, a: rng() * 6.283, w: (raptor ? rr(7, 10) : rr(9, 13)) / sp.R * (rng() < 0.5 ? -1 : 1), bob: rr(5, 18), e: rr(0.6, 1), birds: [], c: new THREE.Vector3() };
+    for (let i = 0; i < sp.n; i++) {
+      const off = raptor ? new THREE.Vector3(rr(-40, 40), rr(-25, 25), rr(-40, 40)) : new THREE.Vector3(rr(-14, 14), rr(-6, 6), rr(-14, 14));
+      F.birds.push({
+        p: new THREE.Vector3(F.cx + off.x, F.cy + off.y, F.cz + off.z), v: new THREE.Vector3(rr(-2, 2), 0, rr(-2, 2)), off,
+        ph: rng() * 6.283, rate: raptor ? rr(5, 6.5) : rr(13, 17), flap: raptor ? 0 : 1, scared: 0, bank: 0, hd: 0, pitch: 0,
+        size: raptor ? rr(2.0, 2.5) : rr(0.8, 1.0),
+      });
+      n++;
+    }
+    flocks.push(F);
+  }
+  const geo = birdGeometry();
+  BIRDS.aP = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4).setUsage(THREE.DynamicDrawUsage);
+  BIRDS.aQ = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4).setUsage(THREE.DynamicDrawUsage);
+  BIRDS.aK = new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 2);
+  geo.setAttribute('aP', BIRDS.aP); geo.setAttribute('aQ', BIRDS.aQ); geo.setAttribute('aK', BIRDS.aK);
+  geo.instanceCount = n;
+  let k = 0;
+  for (const F of flocks) for (let i = 0; i < F.birds.length; i++, k++) { BIRDS.aK.array[k * 2] = F.kind; BIRDS.aK.array[k * 2 + 1] = F.kind ? 0.28 : 0.8; }
+  const mat = new THREE.ShaderMaterial({ uniforms: { ...pickU() }, vertexShader: BIRD_VS, fragmentShader: BIRD_FS, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  R.world.add(mesh);
+  BIRDS.mesh = mesh; BIRDS.flocks = flocks; BIRDS.n = n;
+  updateBirds(0, null);
+}
+const _bt = new THREE.Vector3(), _bd = new THREE.Vector3();
+function updateBirds(dt, player) {
+  if (!BIRDS.mesh) return;
+  const P = BIRDS.aP.array, Q = BIRDS.aQ.array;
+  let k = 0;
+  for (const F of BIRDS.flocks) {
+    const raptor = F.kind === 1;
+    F.a += dt * F.w;
+    F.c.set(F.cx + Math.cos(F.a) * F.R, F.cy + Math.sin(F.a * 0.7) * F.bob, F.cz + Math.sin(F.a) * F.R * F.e);
+    for (const b of F.birds) {
+      if (dt > 0) {
+        const spread = 1 + b.scared * 3;
+        _bt.set(F.c.x + b.off.x * spread, F.c.y + b.off.y * spread, F.c.z + b.off.z * spread);
+        // steer toward the formation slot, flee from the pilot when close
+        const acc = _bd.subVectors(_bt, b.p).multiplyScalar(raptor ? 0.25 : 0.9).addScaledVector(b.v, raptor ? -0.12 : -0.5);
+        if (player) {
+          const dx = b.p.x - player.x, dy = b.p.y - player.y, dz = b.p.z - player.z, d = Math.hypot(dx, dy, dz);
+          if (d < 60 && !raptor) { b.scared = Math.min(1, b.scared + dt * 5); const f = (60 - d) * 2.2 / Math.max(d, 1); acc.x += dx * f; acc.y += Math.abs(dy) * f * 0.6 + 4; acc.z += dz * f; }
+        }
+        b.scared = Math.max(0, b.scared - dt * 0.2);
+        b.v.addScaledVector(acc, dt);
+        const sp = b.v.length(), vmin = raptor ? 8 : 7, vmax = raptor ? 16 : 13 + b.scared * 11;
+        if (sp > vmax) b.v.multiplyScalar(vmax / sp); else if (sp < vmin) b.v.multiplyScalar(vmin / Math.max(sp, 0.01));
+        b.p.addScaledVector(b.v, dt);
+        const floor = groundHeight(b.p.x, b.p.z) + 6;
+        if (b.p.y < floor) { b.p.y = floor; b.v.y = Math.abs(b.v.y); }
+        const hd = Math.atan2(b.v.x, -b.v.z);
+        const turn = wrapAngle(hd - b.hd) / Math.max(dt, 1e-3);
+        b.hd = hd;
+        b.bank = damp(b.bank, clamp(-turn * (raptor ? 0.9 : 0.35), -0.9, 0.9), 4, dt);
+        b.pitch = damp(b.pitch, Math.atan2(b.v.y, Math.hypot(b.v.x, b.v.z)), 5, dt);
+        // choughs flap in bursts and glide; raptors mostly soar
+        const wantFlap = raptor ? (b.v.y > 1.5 ? 1 : 0) : (b.scared > 0.2 || b.v.y > 0.5 || Math.sin(b.ph * 0.07 + k) > -0.2 ? 1 : 0);
+        b.flap = damp(b.flap, wantFlap, 3, dt);
+        b.ph += dt * b.rate * (0.15 + 0.85 * b.flap) * (1 + b.scared * 0.5);
+      }
+      P[k * 4] = b.p.x; P[k * 4 + 1] = b.p.y; P[k * 4 + 2] = b.p.z; P[k * 4 + 3] = b.size;
+      Q[k * 4] = b.hd; Q[k * 4 + 1] = b.pitch; Q[k * 4 + 2] = b.bank; Q[k * 4 + 3] = b.flap > 0.05 ? b.ph : 0.35;
+      k++;
+    }
+  }
+  BIRDS.aP.needsUpdate = true; BIRDS.aQ.needsUpdate = true;
 }
 
 // ------------------------------------------------------------ smoke trail

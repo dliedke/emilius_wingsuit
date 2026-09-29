@@ -16,7 +16,7 @@ const VIS = {
   canopyOn: false, infl: 0, canopyPos: new THREE.Vector3(), canopyQuat: new THREE.Quaternion(),
   pcOn: false, pcPos: new THREE.Vector3(), bridleFrom: new THREE.Vector3(),
   phase: 'ready', phaseT: 0, heading: 0, vel: new THREE.Vector3(), prox: 999, up: new THREE.Vector3(0, 1, 0),
-  headPos: new THREE.Vector3(), canopyMid: new THREE.Vector3(), feet: new THREE.Vector3(),
+  headPos: new THREE.Vector3(), canopyMid: new THREE.Vector3(), feet: new THREE.Vector3(), thrust: 0,
 };
 const _q0 = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _g1 = new THREE.Vector3(), _g2 = new THREE.Vector3(), _g3 = new THREE.Vector3(), _g4 = new THREE.Vector3(), _gm = new THREE.Matrix4();
 
@@ -53,6 +53,7 @@ function computeVis(dt) {
   VIS.roll = damp(VIS.roll, s.phase === 'fly' ? INPUT.roll : 0, 8, dt);
   VIS.pitch = damp(VIS.pitch, s.phase === 'fly' ? INPUT.pitch : 0, 8, dt);
   VIS.bl = s.toggleL; VIS.br = s.toggleR;
+  VIS.thrust = s.phase === 'canopy' ? s.thrust : 0;
   VIS.canopyOn = false; VIS.pcOn = false;
   switch (s.phase) {
     case 'ready':
@@ -133,7 +134,7 @@ function computeVis(dt) {
       const hv = new THREE.Vector3(0, 1, 0);
       const fromP = new THREE.Vector3().copy(s.pos).addScaledVector(hv, 6.75);
       const toP = new THREE.Vector3().copy(s.pos).addScaledVector(f, 6.5);
-      toP.y = groundHeight(toP.x, toP.z) + 0.5;
+      toP.y = surfaceHeight(toP.x, toP.z) + 0.5;
       if (L.kind === 'tree') { toP.copy(fromP); toP.y -= 3; }
       const kk = k * k * (3 - 2 * k);
       VIS.canopyPos.copy(fromP).lerp(toP, kk);
@@ -150,7 +151,7 @@ function computeVis(dt) {
       const right = _g2.set(-f.z, 0, f.x);
       _gm.makeBasis(right, _g3.set(0, 1, 0), _g4.copy(f).negate());
       VIS.quat.setFromRotationMatrix(_gm);
-      VIS.pos.y = groundHeight(s.pos.x, s.pos.z) + 0.18;
+      VIS.pos.y = surfaceHeight(s.pos.x, s.pos.z) + 0.18;
       VIS.fly = 0.35; VIS.hang = 0; VIS.up.set(0, 1, 0);
       break;
     }
@@ -162,7 +163,7 @@ function applyVis(dt) {
   J.root.position.copy(VIS.pos);
   J.root.quaternion.copy(VIS.quat);
   const P = J.pose;
-  P.fly = VIS.fly; P.hang = VIS.hang; P.roll = VIS.roll; P.pitch = VIS.pitch; P.speed = VIS.vel.length(); P.brakeL = VIS.bl; P.brakeR = VIS.br;
+  P.fly = VIS.fly; P.hang = VIS.hang; P.roll = VIS.roll; P.pitch = VIS.pitch; P.speed = VIS.vel.length(); P.brakeL = VIS.bl; P.brakeR = VIS.br; P.thrust = VIS.thrust;
   J.update(dt);
   J.root.updateMatrixWorld(true);
   VIS.headPos.copy(J.head.position); J.root.localToWorld(VIS.headPos);
@@ -234,20 +235,20 @@ function resetRun() {
   Object.assign(SIM, {
     phase: 'ready', time: 0, phaseT: 0, heading: E.heading, alpha: WS.aTrim, bank: 0, inflate: 0, deployT: 0, openShock: 0,
     u: 0, w: 0, yawRate: 0, flare: 0, toggleL: 0, toggleR: 0, swingRoll: 0, swingPitch: 0, outcome: null, crashCause: null, landing: null,
-    agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0,
+    agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0, thrust: 0, fuel: 1,
   });
   SIM.pos.set(E.x, R.exitY + 0.93, E.z);
   SIM.prev.copy(SIM.pos);
   SIM.vel.set(0, 0, 0);
   SIM.liftDir.set(0, 1, 0);
   EVENTS.length = 0;
-  INPUT.pitch = INPUT.roll = INPUT.brakeL = INPUT.brakeR = 0; INPUT.deploy = false;
-  IN.pitch = IN.roll = IN.bl = IN.br = 0;
+  INPUT.pitch = INPUT.roll = INPUT.brakeL = INPUT.brakeR = INPUT.thrust = 0; INPUT.deploy = false;
+  IN.pitch = IN.roll = IN.bl = IN.br = 0; IN.touchThrust = false;
   Object.assign(GAME, { scrapes: 0, score: 0, proxPts: 0, gatePts: 0, mult: 1, streakT: 0, farT: 0, tier: 0, gatesPassed: 0, flightT: 0, maxSpeed: 0, dist: 0, endT: -1, warn: 0, beepT: 0, rec: [], recT: 0 });
   GAME.tierT = [0, 0, 0, 0];
   GAME.lastPos.copy(SIM.pos);
   for (const g of R.gates) { g.state = 0; g.t = 0; g.mesh.visible = true; g.mat.uniforms.uFade.value = 1; g.mesh.scale.setScalar(1); }
-  AUTO.gate = 0; AUTO.cT = 0;
+  AUTO.gate = 0; AUTO.cT = 0; AUTO.hold = null;
   R.trail.pts.length = 0;
   VIS.roll = VIS.pitch = 0;
   CAM.shot = null; CAM.trauma = 0;
@@ -300,10 +301,10 @@ function gameplay(dt) {
       if (r <= g.r + 1.2) {
         g.state = 1; g.t = 0;
         for (let j = 0; j < i; j++) if (R.gates[j].state === 0) { R.gates[j].state = 2; R.gates[j].t = 0; }
-        const pts = (g.notch ? 750 : 250) * GAME.mult;
+        const pts = GATE_POINTS[g.kind] * GAME.mult;
         GAME.gatePts += pts; GAME.score += pts; GAME.gatesPassed++;
-        SFX.gate(g.notch);
-        if (live) callout(i18n(g.notch ? 'callout.notch' : 'callout.gate', { pts }), 'lake', !g.notch);
+        SFX.gate(g.kind !== 0);
+        if (live) callout(i18n(['callout.gate', 'callout.notch', 'callout.lakegate', 'callout.gold'][g.kind], { pts }), g.kind === 3 ? 'gold' : 'lake', g.kind === 0);
       } else if (r < g.r * 5) {
         g.state = 2; g.t = 0;
         for (let j = 0; j < i; j++) if (R.gates[j].state === 0) { R.gates[j].state = 2; R.gates[j].t = 0; }
@@ -367,7 +368,8 @@ function handleEvents() {
       SFX.land(e.kind);
       if (e.kind === 'water') SFX.splash();
       addTrauma(e.kind === 'hard' ? 0.7 : 0.25);
-      if (live) callout(i18n('land.' + e.kind),e.kind === 'perfect' ? 'lake' : e.kind === 'good' ? '' : 'orange');
+      const splash = SIM.landing && SIM.landing.splash;
+      if (live) callout(i18n(splash ? 'land.splash' : 'land.' + e.kind), e.kind === 'perfect' || splash ? 'lake' : e.kind === 'good' ? '' : 'orange');
       GAME.endT = 0;
     } else if (e.type === 'crash') {
       if (e.cause === 'water') SFX.splash(); else SFX.crash();
@@ -385,8 +387,10 @@ function computeScore() {
   const s = SIM;
   const ok = s.outcome === 'landed';
   if (s.landing) {
-    b.landing = { perfect: 800, good: 400, plf: 100, hard: 0, water: 0, tree: 0 }[s.landing.kind] || 0;
-    if (s.landing.kind !== 'water' && s.landing.kind !== 'tree') b.accuracy = s.landing.dist < 3 ? 2000 : Math.max(0, Math.round(1500 - s.landing.dist * 18));
+    const L = s.landing;
+    b.landing = L.splash ? 150 : { perfect: 800, good: 400, plf: 100, hard: 0, water: 0, tree: 0 }[L.kind] || 0;
+    if (L.kind !== 'water' && L.kind !== 'tree') b.accuracy = L.dist < 3 ? 2000 : Math.max(0, Math.round(1500 - L.dist * 18));
+    else if (L.splash) b.accuracy = Math.max(0, Math.round((1500 - L.dist * 18) / 2));
   }
   const total = s.outcome === 'crash' ? b.prox + b.gates : b.prox + b.gates + b.speed + b.landing + b.accuracy;
   return { b, total, ok };
@@ -402,10 +406,10 @@ function renderResults() {
     T.className = 'bad';
     why.textContent = i18n(s.crashCause === 'tree' ? 'result.why.tree' : s.crashCause === 'water' ? 'result.why.water' : 'result.why.terrain', { kmh });
   } else {
-    const L = s.landing;
-    T.textContent = { perfect: i18n('land.perfect'), good: i18n('land.good'), plf: i18n('result.title.plf'), hard: i18n('land.hard'), water: i18n('result.title.waterland'), tree: i18n('result.title.treeland') }[L.kind];
-    T.className = L.kind === 'perfect' || L.kind === 'good' ? 'good' : 'bad';
-    why.textContent = i18n('result.why.landing', { vs: L.vs.toFixed(1), dist: Math.round(L.dist) });
+    const L = s.landing || { kind: 'plf', vs: 0, dist: 0 };
+    T.textContent = L.splash ? i18n('land.splash') : { perfect: i18n('land.perfect'), good: i18n('land.good'), plf: i18n('result.title.plf'), hard: i18n('land.hard'), water: i18n('result.title.waterland'), tree: i18n('result.title.treeland') }[L.kind];
+    T.className = L.kind === 'perfect' || L.kind === 'good' || L.splash ? 'good' : 'bad';
+    why.textContent = L.splash ? i18n('result.why.splash', { dist: Math.round(L.dist) }) : i18n('result.why.landing', { vs: L.vs.toFixed(1), dist: Math.round(L.dist) });
   }
   const mm = Math.floor(GAME.flightT / 60), ss = Math.floor(GAME.flightT % 60).toString().padStart(2, '0');
   const rows = [
@@ -443,7 +447,7 @@ function recordFrame(dt) {
     SIM.time, v.pos.x, v.pos.y, v.pos.z, v.quat.x, v.quat.y, v.quat.z, v.quat.w, PHASES.indexOf(v.phase), v.fly, v.hang, v.roll, v.pitch, v.bl, v.br,
     v.canopyOn ? 1 : 0, v.infl, v.canopyPos.x, v.canopyPos.y, v.canopyPos.z, v.canopyQuat.x, v.canopyQuat.y, v.canopyQuat.z, v.canopyQuat.w,
     v.pcOn ? 1 : 0, v.pcPos.x, v.pcPos.y, v.pcPos.z, v.vel.x, v.vel.y, v.vel.z, v.heading, v.prox, v.phaseT, v.up.x, v.up.y, v.up.z,
-    v.bridleFrom.x, v.bridleFrom.y, v.bridleFrom.z,
+    v.bridleFrom.x, v.bridleFrom.y, v.bridleFrom.z, v.thrust,
   ]);
 }
 function startReplay() {
@@ -488,6 +492,7 @@ function replayUpdate(dt) {
   VIS.pcOn = A[24] > 0.5; VIS.pcPos.set(L(25), L(26), L(27));
   VIS.vel.set(L(28), L(29), L(30)); VIS.heading = A[31]; VIS.prox = L(32); VIS.phaseT = L(33); VIS.up.set(L(34), L(35), L(36)).normalize();
   VIS.bridleFrom.set(L(37), L(38), L(39));
+  VIS.thrust = L(40) || 0;
   // gates light up as the replay passes them
   const a = GAME.lastPos, b = VIS.pos;
   for (const g of R.gates) {
@@ -523,7 +528,8 @@ function buildHud() {
     r = lerp(r, 44, forest * 0.7); gg = lerp(gg, 70, forest * 0.7); bb = lerp(bb, 46, forest * 0.7);
     const light = 0.35 + 0.85 * ndl * (0.35 + 0.65 * sh);
     let R_ = r * light, G_ = gg * light, B_ = bb * light;
-    if (lakeDist(wx, wz) < TC.LAKE.r && h < TC.LAKE.level) { R_ = 40; G_ = 170; B_ = 165; }
+    const lk = TC.lakeAt(wx, wz, 0);
+    if (lk && h < lk.level) { R_ = 40; G_ = 170; B_ = 165; }
     if (Math.abs(wz - TC.riverZ(wx)) < 14) { R_ = 70; G_ = 120; B_ = 130; }
     const o = (y * W + x) * 4;
     img.data[o] = R_; img.data[o + 1] = G_; img.data[o + 2] = B_; img.data[o + 3] = 235;
@@ -537,6 +543,7 @@ function buildHud() {
   g.stroke(); g.setLineDash([]);
   const [lx, lz] = toMM(TC.LZ.x, TC.LZ.z);
   g.fillStyle = '#ff6b1a'; g.beginPath(); g.arc(lx, lz, 6, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#0a1418'; g.lineWidth = 2; g.stroke();
   const [ex, ez] = toMM(TC.EXIT.x, TC.EXIT.z);
   g.fillStyle = '#eef3f1'; g.beginPath(); g.moveTo(ex, ez - 7); g.lineTo(ex + 6, ez + 4); g.lineTo(ex - 6, ez + 4); g.closePath(); g.fill();
   HUD.toMM = toMM;
@@ -579,7 +586,7 @@ function drawMinimapDyn() {
   R.gates.forEach((g, i) => {
     const [x, z] = HUD.toMM(g.x, g.z);
     c.beginPath(); c.arc(x, z, i === gi ? 7 : 4, 0, Math.PI * 2);
-    c.fillStyle = g.state === 1 ? '#3fd0c4' : g.state === 2 ? 'rgba(160,170,175,0.6)' : i === gi ? '#ff6b1a' : 'rgba(255,255,255,0.85)';
+    c.fillStyle = g.state === 1 ? '#3fd0c4' : g.state === 2 ? 'rgba(160,170,175,0.6)' : i === gi ? '#ff6b1a' : g.kind === 3 ? '#ffc21f' : g.kind === 2 ? '#7fe6de' : 'rgba(255,255,255,0.85)';
     c.fill();
   });
   const [px, pz] = HUD.toMM(VIS.pos.x, VIS.pos.z);
@@ -591,7 +598,7 @@ function drawMinimapDyn() {
 function updateHud(dt) {
   GAME.hudT += dt;
   const s = SIM;
-  const ground = groundHeight(s.pos.x, s.pos.z);
+  const ground = surfaceHeight(s.pos.x, s.pos.z);
   drawTape(s.pos.y, ground);
   if (GAME.hudT < 0.05) return;
   GAME.hudT = 0;
@@ -614,8 +621,21 @@ function updateHud(dt) {
   const t = GAME.flightT;
   $('time').textContent = `${Math.floor(t / 60)}:${Math.floor(t % 60).toString().padStart(2, '0')}`;
   const pr = s.phase === 'fly' || s.phase === 'exit' ? s.prox : 999;
-  $('proxv').textContent = pr < 200 ? `${Math.round(pr)} m` : '–';
-  $('proxbar').style.width = `${clamp(1 - pr / 60, 0, 1) * 100}%`;
+  // under the canopy the proximity bar becomes the motor's fuel gauge
+  const motor = s.phase === 'canopy' || (s.phase === 'landed' && s.fuel < 1);
+  if (motor !== HUD.motor) {
+    HUD.motor = motor;
+    $('hud-bottom').classList.toggle('motor', motor);
+    $('proxk').textContent = i18n(motor ? 'hud.motor' : 'hud.proximity');
+  }
+  if (motor) {
+    $('proxv').textContent = s.fuel > 0 ? `${Math.round(s.fuel * 100)}%${IS_TOUCH ? '' : ' · E'}` : i18n('hud.empty');
+    $('proxbar').style.width = `${s.fuel * 100}%`;
+  } else {
+    $('proxv').textContent = pr < 200 ? `${Math.round(pr)} m` : '–';
+    $('proxbar').style.width = `${clamp(1 - pr / 60, 0, 1) * 100}%`;
+  }
+  $('btnthr').hidden = !(IS_TOUCH && s.phase === 'canopy');
   $('vignette').style.opacity = Math.max(pr < 12 ? (1 - pr / 12) * 0.9 : 0, (s.warn || 0) * 0.8);
   // prompts
   const P = $('prompt');
@@ -646,7 +666,7 @@ function predictTouchdown(s) {
   let x = s.pos.x, y = s.pos.y - 1.02, z = s.pos.z;
   const vx = s.vel.x, vz = s.vel.z, w = Math.max(0.4, -s.vel.y);
   for (let i = 0; i < 160; i++) {
-    const h = y - groundHeight(x, z);
+    const h = y - surfaceHeight(x, z);
     if (h <= 0.05) break;
     const st = clamp(h / w * 0.5, 0.03, 2.0);
     x += vx * st; z += vz * st; y -= w * st;
@@ -662,7 +682,7 @@ function updateLandingAids(dt, cam) {
   const s = SIM, LZ = TC.LZ;
   const play = GAME.state === 'play';
   const canopy = play && s.phase === 'canopy';
-  const feet = s.pos.y - 1.02 - groundHeight(s.pos.x, s.pos.z);
+  const feet = s.pos.y - 1.02 - surfaceHeight(s.pos.x, s.pos.z);
   if (canopy) {
     predictTouchdown(s);
     if (!AID.init) { AID.px = AID.tx; AID.pz = AID.tz; AID.init = true; }
@@ -724,7 +744,7 @@ function updateLandingAids(dt, cam) {
         const ux = (LZ.x - s.pos.x) / Math.max(1, dH), uz = (LZ.z - s.pos.z) / Math.max(1, dH);
         const reach = alt / 4.8 * (11.2 + WIND.x * ux + WIND.z * uz);   // straight at it, full glide
         if (predErr < TARGET_R * 1.3) { hint = i18n('aid.online'); hc = 'good'; }
-        else if (reach < dH * 0.9) { hint = i18n('aid.short'); hc = 'bad'; }
+        else if (reach < dH * 0.9) { hint = i18n(s.fuel > 0 ? (IS_TOUCH ? 'aid.motorTouch' : 'aid.motor') : 'aid.short'); hc = 'bad'; }
         else if (reach > dH + 220 && alt > 70) { hint = i18n('aid.high'); hc = 'warn'; }
         else { hint = i18n('aid.aim'); hc = ''; }
       }
@@ -744,7 +764,7 @@ function updateGates(dt) {
     if (g.state === 0) {
       const next = i === gi;
       u.uGlow.value = next ? 0.75 + 0.35 * Math.sin(U.uTime.value * 5) : 0.25;
-      u.uColA.value.copy(GATE_ORANGE).multiplyScalar(next ? 1.3 : 0.9);
+      u.uColA.value.copy(g.col).multiplyScalar(next ? 1.3 : 0.9);
     } else {
       g.t += dt;
       if (g.state === 1) { u.uColA.value.copy(GATE_LAKE).multiplyScalar(1.4); u.uColB.value.copy(GATE_WHITE); u.uGlow.value = 1.4; g.mesh.scale.setScalar(1 + g.t * 0.8); }
@@ -769,6 +789,17 @@ function goFullscreenLandscape() {
 }
 function updateMenuRecord() {
   $('record').textContent = GAME.best ? i18n('menu.record', { n: fmt(GAME.best) }) : i18n('menu.norecord');
+  updateMenuWorld();
+}
+// the current world in the menu: its peak, season and landing, and the seed to share it
+function updateMenuWorld() {
+  if (!STYLE) return;
+  const lz = TC.LZ;
+  $('worldinfo').textContent = `${worldName(SEED)} · ${TC.SUMMIT.h} m · ${i18n('season.' + STYLE.season)} · ${i18n('menu.world')} #${SEED}`;
+  const ex = Math.round(R.exitY || TC.SUMMIT.h), lzh = Math.round(lz.h);
+  $('st-exit').textContent = ex + ' m';
+  $('st-lz').textContent = `${lzh} m · ${i18n('lz.' + lz.type)}`;
+  $('st-drop').textContent = (ex - lzh) + ' m';
   $('ngates').textContent = String(TC.GATES.length);
 }
 function toMenu() {
@@ -776,10 +807,78 @@ function toMenu() {
   show('menu', true); show('scrim', true); show('hud', false); show('result', false); show('pause', false); show('touch', false);
   $('replaytag').hidden = true;
   updateMenuRecord();
-  const ex =Math.round(R.exitY), lz = Math.round(groundHeight(TC.LZ.x, TC.LZ.z));
-  $('st-exit').textContent = ex + ' m'; $('st-lz').textContent = lz + ' m'; $('st-drop').textContent = (ex - lz) + ' m';
   resetRun();
   GAME.attractT = 0;
+}
+
+// ------------------------------------------------------------ worlds
+// Style, heightfields, baking, then every object of the world into R.world.
+async function buildWorldScene(progress) {
+  STYLE = makeStyle(SEED);
+  applyStyle();
+  await buildWorld(progress);
+  progress(1, i18n('load.scene'));
+  await nextFrame();
+  R.world = new THREE.Group();
+  R.scene.add(R.world);
+  R.terrain.push(new TerrainLevel(WORLD.L2, true));
+  R.terrain.push(new TerrainLevel(WORLD.L0, false));
+  buildWater();
+  buildTrees();
+  buildClouds();
+  buildProps();
+  buildGates();
+  buildBirds();
+  buildHud();
+}
+// place the pilot at the exit and warm the GPU up for the new scene
+function settleWorld() {
+  resetRun();
+  applyVis(0);
+  updateCamera(0.016, R.camera, camState(), 3);
+  R.camera.updateMatrixWorld();
+  for (const T of R.terrain) T.update(R.camera, 1);
+  try { R.renderer.compile(R.scene, R.camera); } catch (e) { /* compile lazily */ }
+}
+let WORLD_BUSY = false;
+async function newWorld(seed, thenPlay) {
+  if (WORLD_BUSY) return;
+  WORLD_BUSY = true;
+  GAME.state = 'loading'; GAME.paused = false;
+  for (const id of ['menu', 'scrim', 'hud', 'result', 'pause', 'touch', 'help', 'settings']) show(id, false);
+  $('replaytag').hidden = true;
+  const bar = $('loadbar'), msg = $('loadmsg');
+  bar.style.transition = 'none'; bar.style.width = '0%'; void bar.offsetWidth; bar.style.transition = '';
+  SEED = seed || randomSeed();
+  $('loadinfo').textContent = `${worldName(SEED)} · #${SEED}`;
+  msg.textContent = i18n('load.newworld');
+  show('loading', true);
+  await nextFrame(); await nextFrame();
+  try {
+    disposeWorld();
+    TC = makeTerrainCore(SEED);
+    await buildWorldScene((p, text) => { bar.style.width = `${Math.round(p * 100)}%`; if (text) msg.textContent = text; });
+    settleWorld();
+    show('loading', false);
+    WORLD_BUSY = false;
+    if (thenPlay) startPlay(); else toMenu();
+  } catch (err) {
+    console.error(err);
+    WORLD_BUSY = false;
+    $('loaderr').hidden = false;
+    $('loaderr').textContent = i18n('error.worldbuild') + (err && err.message ? err.message : err);
+  }
+}
+// copy a link that replays this exact world
+function shareWorld() {
+  const url = location.origin + location.pathname + '?seed=' + SEED;
+  const b = $('bshare');
+  const say = (key) => { b.textContent = i18n(key); clearTimeout(b._t); b._t = setTimeout(() => { b.textContent = i18n('menu.share'); }, 1800); };
+  const fallback = () => { try { history.replaceState(null, '', '?seed=' + SEED); } catch (e) { /* ignore */ } say('menu.inurl'); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => say('menu.copied'), fallback);
+    else fallback();
+  } catch (e) { fallback(); }
 }
 function startPlay() {
   initAudio();
@@ -831,6 +930,9 @@ function wireUi() {
   click('of', () => { SETTINGS.smoke = !SETTINGS.smoke; saveSettings(); refreshSettings(); });
   click('oa', () => { SETTINGS.assist = !SETTINGS.assist; saveSettings(); refreshSettings(); });
   click('bagain', startPlay);
+  click('bnew', () => newWorld(0, false));
+  click('bnew2', () => newWorld(0, true));
+  click('bshare', shareWorld);
   click('breplay', startReplay);
   click('bmenu', toMenu);
   click('bresume', () => togglePause(false));
@@ -846,8 +948,9 @@ function onKey(code) {
   if (!$('help').hidden && (code === 'Escape' || code === 'Enter')) { toggleHelp(false); return; }
   if (!$('settings').hidden && code === 'Escape') { show('settings', false); return; }
   if (code === 'KeyM') { setMute(SETTINGS.sound); return; }
-  if (GAME.state === 'menu') { if (code === 'Space') startPlay(); return; }
-  if (GAME.state === 'result') { if (code === 'KeyR' || code === 'Space') startPlay(); else if (code === 'Escape') toMenu(); return; }
+  if (GAME.state === 'loading') return;
+  if (GAME.state === 'menu') { if (code === 'Space') startPlay(); else if (code === 'KeyN') newWorld(0, false); return; }
+  if (GAME.state === 'result') { if (code === 'KeyR' || code === 'Space') startPlay(); else if (code === 'KeyN') newWorld(0, true); else if (code === 'Escape') toMenu(); return; }
   if (GAME.state === 'replay') { if (code === 'Escape' || code === 'Space') endReplay(); return; }
   if (GAME.state !== 'play') return;
   if (code === 'KeyP' || code === 'Escape') { togglePause(); return; }
@@ -877,6 +980,7 @@ function loop(now) {
   let dt = (now - _lastT) / 1000; _lastT = now;
   if (!(dt > 0)) dt = 1 / 60;
   if (dt > 0.1) dt = 0.1;
+  if (GAME.state === 'loading') return;   // a new world is being built
   _frameN++;
   U.uTime.value += dt;
   const gp = pollGamepad(onPadButton);
@@ -928,6 +1032,8 @@ function loop(now) {
   updateTrail(dt, VIS.feet, smoke || (st === 'menu' && (VIS.phase === 'fly' || VIS.phase === 'exit')), cam, U.uTime.value);
   updateSpeedLines(cam, (VIS.phase === 'fly' || VIS.phase === 'exit') && camModeNow() !== 3 ? VIS.vel : _g1.set(0, 0, 0), dt);
   updateGates(dt);
+  const airborne = VIS.phase === 'fly' || VIS.phase === 'exit' || VIS.phase === 'deploy' || VIS.phase === 'canopy';
+  updateBirds(dt, airborne ? VIS.pos : null);
   // windsock
   if (R.sock) {
     const p = R.sock.geometry.attributes.position, b = R.sockBase, t = U.uTime.value;
@@ -937,7 +1043,7 @@ function loop(now) {
   }
   $('mist').style.opacity = (mistAmount(cam.position) * 0.92).toFixed(3);
   if (st === 'play') updateHud(dt);
-  updateAudio(dt, { phase: st === 'menu' ? 'menu' : VIS.phase, vel: VIS.vel, prox: VIS.prox, bank: SIM.bank });
+  updateAudio(dt, { phase: st === 'menu' ? 'menu' : VIS.phase, vel: VIS.vel, prox: VIS.prox, bank: SIM.bank, thrust: VIS.thrust });
   R.renderer.render(R.scene, cam);
   // adaptive resolution
   PERF.acc += dt; PERF.n++;
@@ -990,6 +1096,7 @@ function simulateFixed(sec, pitch, roll) {
 async function boot() {
   const bar = $('loadbar'), msg = $('loadmsg');
   applyI18n();
+  $('loadinfo').textContent = `${worldName(SEED)} · #${SEED}`;
   const progress = (p, text) => { bar.style.width = `${Math.round(p * 100)}%`; if (text) msg.textContent = text; };
   try {
     const test = document.createElement('canvas').getContext('webgl2');
@@ -997,24 +1104,15 @@ async function boot() {
     initRenderer();
     applyQuality();
     CAM.mode = SETTINGS.cam || 0;
-    await buildWorld(progress);
-    msg.textContent = i18n('load.scene');
-    await nextFrame();
+    // things that outlive a world: sky, smoke trail, speed lines, the pilot and the canopy
     buildSky();
-    R.terrain.push(new TerrainLevel(WORLD.L2, true));
-    R.terrain.push(new TerrainLevel(WORLD.L0, false));
-    buildWater();
-    buildTrees();
-    buildClouds();
-    buildProps();
-    buildGates();
     buildTrail();
     buildSpeedLines();
     JUMPER = new Jumper();
     R.scene.add(JUMPER.root);
     CANOPY = new Canopy();
     CANOPY.add(R.scene);
-    buildHud();
+    await buildWorldScene(progress);
     wireUi();
     initInput(onKey, action);
     window.addEventListener('resize', () => {
@@ -1022,17 +1120,17 @@ async function boot() {
       R.renderer.setSize(window.innerWidth, window.innerHeight, false);
     });
     document.addEventListener('visibilitychange', () => { if (document.hidden && GAME.state === 'play') togglePause(true); });
-    resetRun();
-    applyVis(0);
-    updateCamera(0.016, R.camera, camState(), 3);
-    R.camera.updateMatrixWorld();
-    for (const T of R.terrain) T.update(R.camera, 1);
-    try { R.renderer.compile(R.scene, R.camera); } catch (e) { /* compile lazily */ }
+    settleWorld();
     show('loading', false);
     toMenu();
     _lastT = performance.now();
     requestAnimationFrame(loop);
-    window.__emilius = { SIM, GAME, VIS, R, WORLD, TC, INPUT, AUTO, AID, MARKS, startPlay, doJump, CAM, computeScore, groundHeight, simulate, simulateFixed, resetRun, SETTINGS_REF: SETTINGS, showResults, startReplay, toMenu, lookFrom: (p, t, fov) => { if (p && p.length === 4) { p = [p[0], groundHeight(p[0], p[2]) + p[3], p[2]]; } GAME.debugCam = p ? { p, t, fov } : null; } };
+    window.__emilius = {
+      SIM, GAME, VIS, R, WORLD, INPUT, AUTO, AID, MARKS, CAM, BIRDS, SETTINGS_REF: SETTINGS,
+      get TC() { return TC; }, get SEED() { return SEED; }, get STYLE() { return STYLE; },
+      startPlay, doJump, computeScore, groundHeight, surfaceHeight, simulate, simulateFixed, resetRun, showResults, startReplay, toMenu, newWorld,
+      lookFrom: (p, t, fov) => { if (p && p.length === 4) { p = [p[0], groundHeight(p[0], p[2]) + p[3], p[2]]; } GAME.debugCam = p ? { p, t, fov } : null; },
+    };
   } catch (err) {
     console.error(err);
     const e = $('loaderr');

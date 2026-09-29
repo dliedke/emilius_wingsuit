@@ -1,6 +1,6 @@
 // ============================================================== WORLD GEN
-// Two nested heightfields: L0 = detailed flight corridor, L2 = far terrain.
-const L0_DEF = { x0: -1600, z0: -7160, w: 5120, h: 8192 };
+// Two nested heightfields: L0 = detailed flight corridor (placed by the world
+// around its line, TC.BOX), L2 = far terrain.
 const L2_DEF = { x0: -19520, z0: -23640, cell: 40, n: 1025 };
 const CHUNK_Q = 64;
 const WORLD = { L0: null, L2: null, trees: null, treeGrid: null };
@@ -65,7 +65,8 @@ function createWorkerPool() {
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 async function generateHeights(progress) {
-  const L0 = makeLevel(L0_DEF.x0, L0_DEF.z0, CELL0, L0_DEF.w / CELL0 + 1, L0_DEF.h / CELL0 + 1);
+  const B = TC.BOX;
+  const L0 = makeLevel(B.x0, B.z0, CELL0, B.w / CELL0 + 1, B.h / CELL0 + 1);
   const L2 = makeLevel(L2_DEF.x0, L2_DEF.z0, L2_DEF.cell, L2_DEF.n, L2_DEF.n);
   const levels = { 0: L0, 2: L2 };
   const fullRect = [L0.x0 - 480, L0.x1 + 480, L0.z0 - 480, L0.z1 + 480];
@@ -161,11 +162,36 @@ function groundHeight(x, z) {
   if (inLevel(WORLD.L2, x, z)) return levelHeight(WORLD.L2, x, z);
   return 500;
 }
-function lakeDist(x, z) { const L = TC.LAKE; return Math.hypot(x - L.x, (z - L.z) * L.sz); }
+// the floating landing platform (lake landing zones)
+function onPlatform(x, z) { const L = TC.LZ; return L.plat > 0 && Math.hypot(x - L.x, z - L.z) < L.plat; }
 function isWater(x, z) {
-  if (lakeDist(x, z) < TC.LAKE.r + 2 && groundHeight(x, z) < TC.LAKE.level) return 'lake';
+  if (onPlatform(x, z)) return null;
+  const L = TC.lakeAt(x, z, 2);
+  if (L && groundHeight(x, z) < L.level) return 'lake';
   if (Math.abs(z - TC.riverZ(x)) < 11) return 'river';
   return null;
+}
+function waterLevel(x, z) {
+  const L = TC.lakeAt(x, z, 2);
+  if (L) return L.level;
+  if (Math.abs(z - TC.riverZ(x)) < 11) return TC.mainFloor(x) - 0.9;
+  return -1e9;
+}
+// highest thing you can touch: terrain, lake water or the landing platform
+function surfaceHeight(x, z) {
+  const g = groundHeight(x, z);
+  if (onPlatform(x, z)) return Math.max(g, TC.LZ.h);
+  const L = TC.lakeAt(x, z, 0);
+  return L && L.level > g ? L.level : g;
+}
+// distance (in the lake's own units) to the nearest lake shore, for masks
+function lakeShoreDist(x, z) {
+  let best = 1e9;
+  for (const L of TC.LAKES) {
+    if (Math.abs(x - L.x) > L.r + 900 || Math.abs(z - L.z) > L.r + 900) continue;
+    best = Math.min(best, TC.lakeD(L, x, z) - L.r);
+  }
+  return best;
 }
 
 // ------------------------------------------------------------ baking
@@ -233,7 +259,8 @@ function bakeLevel(L, outerHorizon, isFar) {
   const b1 = boxBlur(h, nx, nz, r1), b2 = boxBlur(h, nx, nz, r2), b3 = boxBlur(h, nx, nz, r3);
   const nrm = new Uint8Array(nx * nz * 4);
   const spl = new Uint8Array(nx * nz * 4);
-  const LZ = TC.LZ, LAKE = TC.LAKE;
+  const LZ = TC.LZ;
+  const TL = STYLE.treeLine, SL = STYLE.snowLine, dTL = TL - 2060;
   for (let j = 0; j < nz; j++) {
     const z = z0 + j * cell;
     const ju = j > 0 ? j - 1 : j, jd = j < nz - 1 ? j + 1 : j;
@@ -259,7 +286,7 @@ function bakeLevel(L, outerHorizon, isFar) {
       const slope = 1 - nY;
       const n1 = TC.noise(x / 640 + 3.3, z / 640 - 1.7);
       const n2 = TC.noise(x / 170 - 5.1, z / 170 + 2.2);
-      const treeline = 2060 + n1 * 220;
+      const treeline = TL + n1 * 220;
       let forest = smoothstep(treeline + 70, treeline - 140, hh);
       forest *= 1 - smoothstep(0.3, 0.44, slope + n2 * 0.06);
       const n3 = TC.noise(x / 58 + 1.1, z / 58 - 7.7);
@@ -267,20 +294,22 @@ function bakeLevel(L, outerHorizon, isFar) {
       const dr = Math.abs(z - TC.riverZ(x));
       forest *= 0.08 + 0.92 * smoothstep(640, 900, dr + n2 * 120);
       forest *= smoothstep(150, 330, Math.hypot(x - LZ.x, z - LZ.z));
-      forest *= smoothstep(LAKE.r + 30, LAKE.r + 120, Math.hypot(x - LAKE.x, (z - LAKE.z) * LAKE.sz));
+      forest *= smoothstep(30, 120, lakeShoreDist(x, z));
       forest *= smoothstep(-10, 25, c3 + 40);   // denser in hollows, thin on crests
       // snow: high, sheltered, shaded, not too steep
-      let snow = smoothstep(3020, 3260, hh + n1 * 160 + n2 * 60);
+      let snow = smoothstep(SL - 80, SL + 160, hh + n1 * 160 + n2 * 60);
       snow *= 1 - smoothstep(0.2, 0.36, slope);
       snow *= 0.25 + 0.75 * (1 - S[k]);
       snow *= smoothstep(-0.05, 0.3, -nZ + 0.12 + n2 * 0.3);
       snow = clamp(snow * 1.5 - 0.42 + Math.max(0, c2) * 0.008, 0, 1);
+      snow *= smoothstep(140, 320, Math.hypot(x - LZ.x, z - LZ.z));   // keep the landing a meadow
       if (isFar) {   // far giants: glaciers above ~3300 m
-        snow = Math.max(snow, smoothstep(3050, 3500, hh + n1 * 250) * (1 - smoothstep(0.3, 0.5, slope)));
+        snow = Math.max(snow, smoothstep(SL - 50, SL + 400, hh + n1 * 250) * (1 - smoothstep(0.3, 0.5, slope)));
       }
       // scree / talus: moderate slopes below steep walls, high up
-      const scree = smoothstep(0.07, 0.16, slope) * (1 - smoothstep(0.26, 0.36, slope)) * smoothstep(1900, 2300, hh + n1 * 200) * smoothstep(-8, 12, c2);
-      const wet = 1 - smoothstep(10, 40, dr);
+      const scree = smoothstep(0.07, 0.16, slope) * (1 - smoothstep(0.26, 0.36, slope)) * smoothstep(1900 + dTL, 2300 + dTL, hh + n1 * 200) * smoothstep(-8, 12, c2);
+      const dLand = Math.hypot(x - LZ.x, z - LZ.z);
+      const wet = Math.max(1 - smoothstep(10, 40, dr), (1 - smoothstep(70, 230, dLand)) * (LZ.type === 'mountain' ? 0.9 : 0.5));
       spl[k * 4] = forest * 255 + 0.5;
       spl[k * 4 + 1] = snow * 255 + 0.5;
       spl[k * 4 + 2] = scree * 255 + 0.5;
@@ -319,10 +348,11 @@ function shadowAt(L, x, z) {
 // ------------------------------------------------------------ trees
 // Instances: x, y, z, height, variation, kind (0 spruce, 1 larch, 2 broadleaf)
 function placeTrees(L) {
-  const rng = mulberry32(4242);
+  const rng = mulberry32(Math.imul(SEED, 31) + 4242);
   const cellT = 10;
   const out = [];
   const LZ = TC.LZ;
+  const TL = STYLE.treeLine, floorTop = TC.F0 + 320;
   for (let z = L.z0 + 2; z < L.z1 - 2; z += cellT) {
     for (let x = L.x0 + 2; x < L.x1 - 2; x += cellT) {
       const f = splatAt(L, x + cellT * 0.5, z + cellT * 0.5, 0);
@@ -341,10 +371,10 @@ function placeTrees(L) {
         const px = x + rng() * cellT, pz = z + rng() * cellT;
         const y = levelHeight(L, px, pz);
         if (isWater(px, pz)) continue;
-        const nearTreeline = smoothstep(1500, 2150, y);
+        const nearTreeline = smoothstep(TL - 560, TL + 90, y);
         let kind = 0;
-        if (y < 900 && dr < 900) kind = 2;
-        else if (rng() < 0.18 + 0.35 * nearTreeline) kind = 1;
+        if (y < floorTop && dr < 900) kind = 2;
+        else if (rng() < STYLE.larchMix + 0.35 * nearTreeline) kind = 1;
         let ht = kind === 2 ? 9 + rng() * 9 : 14 + rng() * 17;
         ht *= 1 - 0.5 * nearTreeline;
         out.push(px, y - 0.4, pz, ht, rng(), kind);
@@ -438,7 +468,7 @@ function dataTexFloat(f32, w, h) {
 function addSlopeDetail(L) {
   const { nx, nz, cell, h, x0, z0 } = L;
   const src = h.slice();
-  const S = TC.SUMMIT, N = TC.NOTCH, LZ = TC.LZ, LK = TC.LAKE;
+  const S = TC.SUMMIT, N = TC.NOTCH || { x: 1e9, z: 1e9 }, LZ = TC.LZ;
   for (let j = 1; j < nz - 1; j++) {
     const z = z0 + j * cell;
     for (let i = 1; i < nx - 1; i++) {
@@ -448,7 +478,7 @@ function addSlopeDetail(L) {
       let amp = 0.6 + 7.5 * smoothstep(0.35, 1.3, slope);
       const dS = Math.hypot(x - S.x, z - S.z), dN = Math.hypot(x - N.x, z - N.z), dL = Math.hypot(x - LZ.x, z - LZ.z);
       amp *= smoothstep(14, 60, dS) * (0.35 + 0.65 * smoothstep(25, 90, dN)) * smoothstep(60, 180, dL);
-      if (Math.hypot(x - LK.x, (z - LK.z) * LK.sz) < LK.r + 25) amp = 0;
+      if (amp > 0.05 && lakeShoreDist(x, z) < 25) amp = 0;
       if (amp < 0.05) continue;
       const r1 = 1 - Math.abs(TC.noise(x / 46 + 0.7, z / 46 - 3.1) * 1.4);
       const r2 = 1 - Math.abs(TC.noise(x / 19 - 5.2, z / 19 + 2.6) * 1.4);

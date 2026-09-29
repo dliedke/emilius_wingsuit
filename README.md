@@ -3,11 +3,25 @@
 ![Voando de wingsuit perto do lago](docs/screenshot.jpg)
 
 Jogo de wingsuit e BASE jump feito só com HTML, CSS e JavaScript ([Three.js](https://threejs.org/)).
-Você salta do cume do Monte Emilius (3.559 m, Vale de Aosta), voa colado no relevo passando por 10 portões,
-abre o paraquedas acima do vale e tenta pousar no alvo, 2.960 m abaixo da saída.
+Você salta do cume de uma montanha, voa colado no relevo passando pelos portões,
+abre o paraquedas e tenta pousar no alvo — e **a cada salto o mundo é outro**: montanhas, cristas, lagos,
+neve, florestas, pássaros, portões e o local de pouso são gerados na hora.
 
 Inspirado no vídeo [“My Most Breathtaking Wingsuit Flight Ever – Monte Emilius”](https://www.youtube.com/watch?v=i8wRc8LuLxc), do RitschWingsuit.
-O relevo é gerado de forma procedural, e não é uma cópia topográfica exata da montanha.
+
+### Um mundo novo a cada salto
+
+- Cada visita começa num mundo aleatório, com nome próprio (por exemplo "Aiguille d'Aurolara · 3508 m").
+  O botão **Novo mundo** (tecla `N`) gera outro no menu e na tela de resultado; **Voar de novo** (`R`) repete o mesmo.
+- O cume, a crista que desce dele, os vales e o traçado mudam de mundo para mundo. Na maioria dos mundos o traçado
+  cruza a crista por uma **fenda entre duas torres**.
+- **Portões aleatórios**: portões normais, a fenda (vale mais), o portão sobre a saída de um lago e **anéis de ouro**, menores.
+- **Três tipos de pouso**: um campo no vale principal, uma **plataforma flutuando num lago** (cair na água ao lado dela
+  ainda conta como pouso, um "Splash!") ou uma **encosta alta da montanha**, com um refúgio.
+- Estação do ano, linha de neve e de árvores, cor da rocha, posição do sol, vento, névoa e nuvens variam por mundo.
+- Bandos de gralhas-alpinas que se espalham quando você passa perto, e águias girando nas térmicas.
+- Para repetir ou compartilhar um mundo, use o link com a semente (`?seed=12345`); o menu tem um botão
+  **Copiar link deste mundo**.
 
 ## Jogar
 
@@ -39,31 +53,35 @@ O `docs/index.html` já vem pronto e carrega o Three.js pela CDN do jsDelivr. N�
 | `A` / `D` | Freio esquerdo / direito para curvar |
 | `S` ou `Espaço` | Flare com os dois freios, a 3–5 m do chão |
 | `W` | Tirantes dianteiros: desce mais rápido |
+| `E` / `Shift` | Motor (paramotor): voa mais rápido e segura a altura, com 30 s de combustível |
 
 | Geral | |
 |---|---|
 | `C` | Trocar câmera (perseguição, capacete, drone lateral, cinema) |
 | `F` / `M` | Fumaça nos pés / som |
 | `P` / `R` | Pausa / recomeçar |
+| `N` | Novo mundo (no menu e no resultado) |
 | `H` | Ajuda |
 
-**Gamepad:** analógico esquerdo pilota, A é a ação, B troca a câmera e os gatilhos são os freios.
-**Celular:** arraste do lado esquerdo para pilotar e use o botão laranja para a ação.
+**Gamepad:** analógico esquerdo pilota, A é a ação, B troca a câmera, os gatilhos são os freios e RB (ou X) liga o motor.
+**Celular:** arraste do lado esquerdo para pilotar, use o botão laranja para a ação e segure **MOTOR** sob o paraquedas.
 
 ### Como pontuar
 
 - Voe perto do relevo para somar pontos de proximidade. Ficar perto por alguns segundos sobe o multiplicador.
-- Passe pelos 10 portões. A fenda entre as duas torres vale mais.
-- Abra o paraquedas na faixa laranja do altímetro. O bipe avisa a hora.
-- Pouse no alvo. Sob o paraquedas, o marcador laranja na tela aponta o alvo, e o anel amarelo no chão mostra onde você vai tocar se seguir reto. O anel fica verde quando está em cima do alvo. A fumaça laranja mostra a direção do vento.
+- Passe pelos portões: 250 pontos cada, 500 no portão do lago e nos anéis de ouro, 750 na fenda entre as torres.
+- Abra o paraquedas na faixa laranja do altímetro (a altura é medida acima do pouso). O bipe avisa a hora.
+- Pouse no alvo. Sob o paraquedas, o marcador laranja na tela aponta o alvo, e o anel amarelo no chão (ou na água) mostra onde você vai tocar se seguir reto. O anel fica verde quando está em cima do alvo. A fumaça laranja mostra a direção do vento.
+- Se não for alcançar o alvo, segure o motor: o marcador avisa quando for preciso, e a barra de baixo mostra o combustível.
 - A **assistência de voo** (em Ajustes, ligada por padrão) levanta o nariz antes de uma batida e transforma toques rasantes em "raspadas" que custam pontos em vez de acabar o voo.
 
 ## Como funciona
 
-- **Relevo procedural** (`src/terrain-core.js`): ruído com derivadas, fBm erodido, cristas multifractais, vales escavados, a face de saída no cume, o lago, a fenda entre as torres e o campo de pouso. A mesma função roda no Node, nos Web Workers e no jogo.
-- **Geração em Web Workers** (`src/10-worldgen.js`): dois campos de altura aninhados (4 m no desktop e 8 m no celular perto do corredor de voo, 40 m no resto), com normais, sombra do sol, oclusão ambiente, mapas de vegetação e posição de árvores pré-calculados.
+- **Mundo procedural** (`src/terrain-core.js`): a partir da semente, decide o cume, a crista principal, o traçado com os portões (e a fenda, quando há), os vales, os lagos, o rio e o tipo de pouso; depois esculpe o relevo com ruído com derivadas, fBm erodido, cristas multifractais e vales escavados, e aplica os detalhes da face de saída, dos lagos e do pouso. A mesma função roda no Node, nos Web Workers e no jogo.
+- **Geração em Web Workers** (`src/10-worldgen.js`): dois campos de altura aninhados (4 m no desktop e 8 m no celular perto do corredor de voo, 40 m no resto), com normais, sombra do sol, oclusão ambiente, mapas de vegetação e posição de árvores pré-calculados. Tudo o que pertence ao mundo fica em `R.world` e é descartado antes de gerar o próximo.
 - **Terreno na GPU** (`src/30-scene.js`, `src/20-shaders.js`): chunks instanciados com 5 níveis de detalhe, geomorphing, saias contra frestas, textura de altura em float, sombreamento triplanar com bump por derivadas, névoa de altura, sombras analíticas do piloto e do velame e depth buffer logarítmico.
-- **Física** (`src/50-flight.js`): passo fixo de 120 Hz, aerodinâmica da wingsuit com tabelas de sustentação e arrasto por ângulo de ataque e inclinação, sequência de abertura do paraquedas com choque de abertura, modelo de velame com freios, flare e vento, e detecção de proximidade em 12 direções.
+- **Física** (`src/50-flight.js`): passo fixo de 120 Hz, aerodinâmica da wingsuit com tabelas de sustentação e arrasto por ângulo de ataque e inclinação, sequência de abertura do paraquedas com choque de abertura, modelo de velame com freios, flare, vento e motor, e detecção de proximidade em 12 direções.
+- **Pássaros** (`src/30-scene.js`): gralhas e águias instanciadas, com o bater das asas no vertex shader.
 - **Câmeras** (`src/60-camera.js`), **áudio sintetizado com WebAudio** (`src/70-audio.js`), **teclado, toque e gamepad** (`src/80-input.js`).
 - **Jogo** (`src/90-game.js`): pontuação, portões, replay gravado, HUD, minimapa, marcador do alvo, resolução adaptativa e ajustes salvos no `localStorage`.
 
@@ -101,15 +119,23 @@ python -m playwright install chromium
 python tests/test_canopy.py saida/          # abertura do paraquedas, câmeras, pouso e replay
 python tests/test_target.py saida/          # visibilidade do alvo sob o paraquedas
 python tests/test_fixed.py                  # voa com comandos fixos e confere se não bate
+python tests/test_worlds.py 1 12            # gera 12 mundos no jogo e voa cada um com o piloto automático
 ```
 
-Para ver o relevo de cima sem abrir o navegador:
+Para conferir muitos mundos direto na função do relevo (traçado livre, portões acima do chão, lagos que seguram a água):
 
 ```bash
-node tools/terrain-preview.js               # gera preview.png com o traçado, os portões e o alvo
+node tools/validate-worlds.js 300           # valida os mundos 1 a 300
 ```
 
-No console do navegador, `window.__emilius` expõe o estado do jogo para depuração (por exemplo, `__emilius.AUTO.on = true` liga o piloto automático).
+Para ver o relevo de um mundo de cima sem abrir o navegador:
+
+```bash
+node tools/terrain-preview.js 18            # mundo 18: gera preview.png com o traçado, os portões, os lagos e o alvo
+```
+
+No console do navegador, `window.__emilius` expõe o estado do jogo para depuração (por exemplo, `__emilius.AUTO.on = true` liga o piloto automático e `__emilius.newWorld(42)` gera o mundo 42).
+Os testes abrem sempre o mesmo mundo (`local.html?seed=18`), para as capturas serem comparáveis.
 
 ## Créditos
 

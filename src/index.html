@@ -66,6 +66,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 .mbtn.primary { font-size: 44px; color: var(--signal); }
 .mbtn.primary:hover { color: var(--snow); }
 .record { font-family: var(--f-data); font-size: 13px; color: var(--mist); }
+.share { background: none; border: 0; padding: 0; font-family: var(--f-data); font-size: 12px; letter-spacing: 0.06em; color: var(--lake); cursor: pointer; justify-self: start; text-decoration: underline; text-underline-offset: 3px; }
+.share:hover { color: var(--snow); }
 .credit { position: fixed; right: max(20px, var(--safe-r)); bottom: calc(16px + var(--safe-b)); font-size: 13px; color: var(--mist); text-align: right; max-width: 60vw; }
 .credit a { color: var(--snow); }
 
@@ -96,12 +98,15 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 .proxbar { position: relative; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .proxbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, var(--lake), #ffd24a 55%, var(--signal) 80%, var(--danger)); }
 .proxbar s { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.5); }
+#hud-bottom.motor .proxbar i { background: linear-gradient(90deg, var(--danger), #ffd24a 30%, var(--good)); }
+#hud-bottom.motor .proxbar s { display: none; }
 #hud-msg { position: absolute; left: 50%; top: calc(18% + var(--safe-t)); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
 .callout { font-family: var(--f-display); font-weight: 900; font-size: clamp(30px, 5vw, 52px); letter-spacing: 0.04em; text-transform: uppercase; text-shadow: 0 2px 18px rgba(0,0,0,0.45); animation: pop 1.6s ease-out forwards; white-space: nowrap; }
 .callout.small { font-size: clamp(18px, 2.6vw, 26px); font-weight: 800; }
 .callout.orange { color: var(--signal); }
 .callout.lake { color: var(--lake); }
 .callout.red { color: var(--danger); }
+.callout.gold { color: #ffc21f; }
 @keyframes pop { 0% { opacity: 0; transform: translateY(8px) scale(0.92); } 10% { opacity: 1; transform: translateY(0) scale(1.04); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
 #prompt { position: absolute; left: 50%; bottom: calc(36% + var(--safe-b)); transform: translateX(-50%); font-family: var(--f-display); font-weight: 800; font-size: clamp(22px, 3vw, 30px); letter-spacing: 0.06em; text-transform: uppercase; text-align: center; text-shadow: 0 2px 14px rgba(0,0,0,0.5); }
 #prompt small { display: block; margin-top: 8px; font-family: var(--f-ui); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
@@ -184,9 +189,22 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 #btnact { position: absolute; right: max(22px, var(--safe-r)); bottom: calc(40px + var(--safe-b)); width: 108px; height: 108px; border-radius: 50%; border: 0; background: var(--signal); color: #1a0d05; font-family: var(--f-display); font-weight: 900; font-size: 22px; letter-spacing: 0.06em; pointer-events: auto; touch-action: none; box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
 .tbtn { position: absolute; pointer-events: auto; border-radius: 22px; border: 1px solid var(--line); background: var(--panel); padding: 8px 14px; font-size: 14px; font-weight: 600; }
 #btncam { right: max(22px, var(--safe-r)); bottom: calc(162px + var(--safe-b)); }
+#btnthr { position: absolute; right: calc(max(22px, var(--safe-r)) + 122px); bottom: calc(52px + var(--safe-b)); width: 84px; height: 84px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); background: rgba(8,16,20,0.55); color: var(--snow); font-family: var(--f-display); font-weight: 900; font-size: 17px; letter-spacing: 0.06em; pointer-events: auto; touch-action: none; }
+#btnthr.on { background: var(--good); color: #0d1a08; border-color: var(--good); }
 #btnpause { right: max(22px, var(--safe-r)); top: calc(220px + var(--safe-t)); }
 
 @media (max-height: 640px) { #minimap { display: none; } }
+/* phones in landscape: the menu has to fit in ~390 px of height */
+@media (max-height: 500px) {
+  #menu { justify-content: flex-start; overflow-y: auto; padding-top: calc(12px + var(--safe-t)); padding-bottom: calc(12px + var(--safe-b)); }
+  #menu .col { gap: 7px; }
+  #menu .title { font-size: clamp(40px, 14vh, 64px); }
+  .sub { font-size: 17px; margin-top: 0; }
+  .menu-btns { gap: 2px; margin-top: 2px; }
+  .mbtn { font-size: 21px; padding: 2px 0; }
+  .mbtn.primary { font-size: 30px; }
+  .credit { display: none; }
+}
 @media (max-height: 520px) { .ro:nth-child(4) { display: none; } #camtag { display: none; } }
 /* short viewports (phones in landscape) — the width-based rules below don't catch these,
    so shrink the bottom HUD card here or it eats a big chunk of the little vertical room */
@@ -214,7 +232,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 @media (prefers-reduced-motion: reduce) { .callout { animation-duration: 2.4s; } #prompt.blink { animation: none; } }
 </style>
 
-<canvas id="c" aria-label="Voo de wingsuit em 3D no Monte Emilius"></canvas>
+<canvas id="c" aria-label="Voo de wingsuit em 3D em montanhas geradas na hora"></canvas>
 <div id="mist"></div>
 <div id="vignette"></div>
 <div id="flash"></div>
@@ -222,7 +240,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="loading">
   <div class="wrap">
-    <div class="eyebrow" data-i18n="eyebrow.loading">Monte Emilius · 3559 m · Valle d'Aosta</div>
+    <div class="eyebrow" id="loadinfo"></div>
     <h1 class="title">EMILIUS<br><em>WINGSUIT</em></h1>
     <div class="bar"><i id="loadbar"></i></div>
     <div id="loadmsg" data-i18n="load.prepare">Preparando o salto…</div>
@@ -232,18 +250,20 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 
 <div id="menu" hidden>
   <div class="col">
-    <div class="eyebrow" data-i18n="eyebrow.menu">Monte Emilius · 3559 m · Valle d'Aosta · 45°40′N 7°23′E</div>
+    <div class="eyebrow" id="worldinfo"></div>
     <h1 class="title">EMILIUS</h1>
     <div class="sub" data-i18n="menu.subtitle">Salto BASE de wingsuit</div>
     <div class="stats"><span><span data-i18n="stat.exit">Saída</span> <b class="num" id="st-exit">3556 m</b></span><span><span data-i18n="stat.lz">Pouso</span> <b class="num" id="st-lz">596 m</b></span><span><span data-i18n="stat.drop">Desnível</span> <b class="num" id="st-drop">2960 m</b></span><span><b class="num" id="ngates">10</b> <span data-i18n="stat.gates">portões</span></span></div>
     <div class="menu-btns">
       <button class="mbtn primary" id="bplay"><span data-i18n="menu.play">Saltar</span> <small data-i18n="key.space">Espaço</small></button>
+      <button class="mbtn" id="bnew"><span data-i18n="menu.newworld">Novo mundo</span> <small>N</small></button>
       <button class="mbtn" id="bhelp"><span data-i18n="menu.controls">Controles</span> <small>H</small></button>
       <button class="mbtn" id="bsettings" data-i18n="menu.settings">Ajustes</button>
     </div>
     <div class="record" id="record"></div>
+    <button class="share" id="bshare" data-i18n="menu.share">Copiar link deste mundo</button>
   </div>
-  <div class="credit" data-i18n-html="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Relevo reconstruído de forma procedural.</div>
+  <div class="credit" data-i18n-html="credit">Inspirado no voo de <a href="https://www.youtube.com/watch?v=i8wRc8LuLxc" target="_blank" rel="noopener">RitschWingsuit no Monte Emilius</a>. Cada mundo é gerado na hora: montanhas, lagos, portões e pouso diferentes a cada vez.</div>
 </div>
 
 <div id="hud" hidden>
@@ -271,7 +291,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
       </div>
     </div>
     <div class="prox">
-      <div class="lbl"><span data-i18n="hud.proximity">Proximidade</span><span id="proxv" class="num">–</span></div>
+      <div class="lbl"><span id="proxk" data-i18n="hud.proximity">Proximidade</span><span id="proxv" class="num">–</span></div>
       <div class="proxbar"><i id="proxbar"></i><s style="left:50%"></s><s style="left:75%"></s><s style="left:90%"></s></div>
     </div>
   </div>
@@ -286,6 +306,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 <div id="touch" hidden>
   <div id="joyzone"><div id="joybase"><div id="joyknob"></div></div></div>
   <button id="btnact">SALTAR</button>
+  <button id="btnthr" data-i18n="btn.motor" hidden>MOTOR</button>
   <button id="btncam" class="tbtn" data-i18n="touch.camera">Câmera</button>
   <button id="btnpause" class="tbtn" data-i18n="touch.pause">Pausa</button>
 </div>
@@ -298,6 +319,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     <div class="newrec" id="rnew" data-i18n="result.newrecord" hidden>Novo recorde</div>
     <div class="row">
       <button class="btn primary" id="bagain"><span data-i18n="result.again">Voar de novo</span> <kbd>R</kbd></button>
+      <button class="btn primary" id="bnew2"><span data-i18n="result.newworld">Novo mundo</span> <kbd>N</kbd></button>
       <button class="btn" id="breplay" data-i18n="result.replay">Ver replay</button>
       <button class="btn" id="bmenu">Menu</button>
     </div>
@@ -328,10 +350,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
       <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.brakes">Freio esquerdo / direito para curvar</span>
       <span><kbd>S</kbd> <span data-i18n="help.or">ou</span> <kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.flare">Flare com os dois freios, a 3–5 m do chão</span>
       <span><kbd>W</kbd></span><span data-i18n="help.frontrisers">Tirantes dianteiros: desce mais rápido</span>
+      <span><kbd>E</kbd> <kbd>Shift</kbd></span><span data-i18n="help.motor">Motor: voa mais rápido e segura a altura (combustível limitado)</span>
       <h3 data-i18n="help.section.general">Geral</h3>
       <span><kbd>C</kbd></span><span data-i18n="help.camera">Trocar câmera</span>
       <span><kbd>F</kbd> <kbd>M</kbd></span><span data-i18n="help.smokesound">Fumaça · som</span>
       <span><kbd>P</kbd> <kbd>R</kbd></span><span data-i18n="help.pauserestart">Pausa · recomeçar</span>
+      <span><kbd>N</kbd></span><span data-i18n="help.newworld">Novo mundo (no menu e no resultado)</span>
     </div>
     <p class="note" data-i18n="help.note1">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
     <p class="note" data-i18n="help.note2">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
