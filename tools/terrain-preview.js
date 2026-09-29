@@ -1,4 +1,7 @@
 // Dev-only: terrain design previews (hillshade + contours + line) and timing.
+//   node tools/terrain-preview.js [seed] [cell] [out.png]
+// Renders the detailed flight box of that world, prints the gate profile and
+// the minimum clearance along each segment of the line.
 const fs = require('fs');
 const zlib = require('zlib');
 const { makeTerrainCore } = require('../src/terrain-core.js');
@@ -20,28 +23,27 @@ function chunk(type, data) {
 }
 function writePNG(file, w, h, rgb) {
   const raw = Buffer.alloc((w * 3 + 1) * h);
-  for (let y = 0; y < h; y++) { raw[y * (w * 3 + 1)] = 0; rgb.copy ? rgb.copy(raw, y * (w * 3 + 1) + 1, y * w * 3, (y + 1) * w * 3) : null; }
+  for (let y = 0; y < h; y++) { raw[y * (w * 3 + 1)] = 0; rgb.copy(raw, y * (w * 3 + 1) + 1, y * w * 3, (y + 1) * w * 3); }
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
   const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
   fs.writeFileSync(file, png);
 }
 
-const T = makeTerrainCore(1337);
 const args = process.argv.slice(2);
-const x0 = +(args[0] ?? -1600), z0 = +(args[1] ?? -7160), W = +(args[2] ?? 5120), H = +(args[3] ?? 8192), cell = +(args[4] ?? 8);
-const out = args[5] ?? 'preview.png';
+const seed = +(args[0] ?? 1337), cell = +(args[1] ?? 16), out = args[2] ?? 'preview.png';
+const T = makeTerrainCore(seed);
+const { x0, z0, w: W, h: H } = T.BOX;
 const nx = Math.round(W / cell) + 1, nz = Math.round(H / cell) + 1;
 const hf = new Float32Array(nx * nz);
 let t0 = Date.now();
 for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) hf[j * nx + i] = T.height(x0 + i * cell, z0 + j * cell);
 const ms = Date.now() - t0;
+console.log(`seed ${seed}: ${T.LZ.type} landing, ${T.NOTCH ? 'notch' : 'no notch'}, summit ${T.SUMMIT.h} m, ${T.GATES.length} gates, ${T.LAKES.length} lakes`);
 console.log(`samples ${nx}x${nz}=${nx * nz}  time ${ms}ms  (${(ms * 1e6 / (nx * nz)).toFixed(0)} ns/sample)`);
 
-// hillshade
-const sun = [Math.cos(38 * Math.PI / 180) * Math.cos(200 * Math.PI / 180), Math.sin(38 * Math.PI / 180), Math.cos(38 * Math.PI / 180) * Math.sin(200 * Math.PI / 180)];
-// sun from WSW: direction vector pointing TO the sun: x negative (west), z slightly positive (south)
-sun[0] = -0.72; sun[1] = 0.62; sun[2] = 0.31;
+// hillshade, sun from the WSW
+const sun = [-0.72, 0.62, 0.31];
 const sl = Math.hypot(...sun); sun[0] /= sl; sun[1] /= sl; sun[2] /= sl;
 const rgb = Buffer.alloc(nx * nz * 3);
 function ramp(h) {
@@ -65,13 +67,14 @@ for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
   const slope = 1 - n[1];
   let base = ramp(h);
   if (slope > 0.35) base = base.map((c, q) => c * 0.6 + [110, 100, 92][q] * 0.4);
-  let shade = 0.35 + 0.8 * ndl;
-  // contour every 100m
+  const shade = 0.35 + 0.8 * ndl;
+  // contour every 100 m
   const c100 = Math.abs(((h % 100) + 100) % 100 - 50) > 48.5 - cell * 0.25;
   let col = base.map(c => Math.min(255, c * shade));
   if (c100) col = col.map(c => c * 0.55);
-  // lake
-  if (Math.hypot(x0 + i * cell - T.LAKE.x, (z0 + j * cell - T.LAKE.z) * 1.12) < 700 && h < T.LAKE.level) col = [40, 180, 175];
+  const L = T.lakeAt(x0 + i * cell, z0 + j * cell, 0);
+  if (L && h < L.level) col = [40, 180, 175];
+  if (Math.abs(z0 + j * cell - T.riverZ(x0 + i * cell)) < 12) col = [60, 120, 150];
   rgb[k * 3] = col[0]; rgb[k * 3 + 1] = col[1]; rgb[k * 3 + 2] = col[2];
 }
 function plot(x, z, c, r = 1) {
@@ -82,20 +85,22 @@ function plot(x, z, c, r = 1) {
   }
 }
 // line
-const L = T.LINE;
-for (let s = 0; s < L.length - 1; s++) {
-  const a = L[s], b = L[s + 1]; const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (cell * 0.5));
+const Ln = T.LINE;
+for (let s = 0; s < Ln.length - 1; s++) {
+  const a = Ln[s], b = Ln[s + 1]; const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (cell * 0.5));
   for (let q = 0; q <= n; q++) plot(a[0] + (b[0] - a[0]) * q / n, a[1] + (b[1] - a[1]) * q / n, [255, 120, 20], 0);
 }
-for (const g of T.GATES) plot(g[0], g[1], [255, 255, 255], 2);
+const GATE_COL = [[255, 255, 255], [255, 60, 200], [60, 220, 255], [255, 215, 40]];
+for (const g of T.GATES) plot(g[0], g[1], GATE_COL[g[4]], 2);
 plot(T.LZ.x, T.LZ.z, [255, 40, 40], 3);
 plot(T.SUMMIT.x, T.SUMMIT.z, [255, 255, 0], 3);
 writePNG(out, nx, nz, rgb);
-console.log('height range', hmin.toFixed(0), hmax.toFixed(0));
+console.log('height range', hmin.toFixed(0), hmax.toFixed(0), '->', out);
 // profile along gates
-const hAt = (x, z) => T.height(x, z);
+const hAt = (x, z) => { const L = T.lakeAt(x, z, 0); return Math.max(T.height(x, z), L ? L.level : -1e9); };
 console.log('exit ground', hAt(T.EXIT.x, T.EXIT.z).toFixed(1), 'summit', hAt(0, 0).toFixed(1));
 let prev = [T.EXIT.x, T.EXIT.z, hAt(T.EXIT.x, T.EXIT.z) + 1.8];
+const KIND = ['gate', 'notch', 'lake', 'gold'];
 for (const g of T.GATES) {
   const gh = hAt(g[0], g[1]);
   const d = Math.hypot(g[0] - prev[0], g[1] - prev[1]);
@@ -105,17 +110,8 @@ for (const g of T.GATES) {
     const t = q / 60; const x = prev[0] + (g[0] - prev[0]) * t, z = prev[1] + (g[1] - prev[1]) * t, y = prev[2] + (g[2] - prev[2]) * t;
     const c = y - hAt(x, z); if (c < minClr) { minClr = c; worst = [x.toFixed(0), z.toFixed(0)]; }
   }
-  console.log(`gate (${g[0]},${g[1]}) y=${g[2]} ground=${gh.toFixed(0)} clr=${(g[2] - gh).toFixed(0)}  seg ${d.toFixed(0)}m drop ${(prev[2] - g[2]).toFixed(0)} glide ${(d / (prev[2] - g[2])).toFixed(2)} minClr ${minClr.toFixed(0)} @${worst}`);
+  console.log(`${KIND[g[4]].padEnd(5)} (${g[0].toFixed(0)},${g[1].toFixed(0)}) y=${g[2].toFixed(0)} ground=${gh.toFixed(0)} clr=${(g[2] - gh).toFixed(0)}  seg ${d.toFixed(0)}m drop ${(prev[2] - g[2]).toFixed(0)} glide ${(d / (prev[2] - g[2])).toFixed(2)} minClr ${minClr.toFixed(0)} @${worst}`);
   prev = [g[0], g[1], g[2]];
 }
-console.log('LZ ground', hAt(T.LZ.x, T.LZ.z).toFixed(1), ' lake level', T.LAKE.level, 'lake center ground', hAt(T.LAKE.x, T.LAKE.z).toFixed(1));
-// exit face profile
-let s = '';
-for (let d = 0; d <= 400; d += 20) s += `${d}:${hAt(0, -d).toFixed(0)} `;
-console.log('north face profile:', s);
-// notch cross-section along crest and across
-const N = T.NOTCH; let s2 = '', s3 = '';
-const cx = 100, cz = -210, cl = Math.hypot(cx, cz);
-for (let a = -150; a <= 150; a += 15) s2 += `${a}:${hAt(N.x + cx / cl * a, N.z + cz / cl * a).toFixed(0)} `;
-for (let a = -300; a <= 300; a += 30) s3 += `${a}:${hAt(N.x - cz / cl * a, N.z + cx / cl * a).toFixed(0)} `;
-console.log('notch along crest:', s2); console.log('notch across:', s3);
+console.log(`landing ${T.LZ.type} at (${T.LZ.x.toFixed(0)},${T.LZ.z.toFixed(0)}) h=${T.LZ.h} ground ${hAt(T.LZ.x, T.LZ.z).toFixed(1)}`);
+for (const L of T.LAKES) console.log(`lake (${L.x.toFixed(0)},${L.z.toFixed(0)}) r=${L.r.toFixed(0)} level=${L.level.toFixed(0)}${L.lz ? ' (landing)' : L.gate !== undefined ? ' (gate)' : ''}`);

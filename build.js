@@ -29,7 +29,7 @@ const full = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,${favicon}">
-<meta name="description" content="Wingsuit e BASE jump em 3D no navegador, inspirado no voo do Monte Emilius.">
+<meta name="description" content="Wingsuit e BASE jump em 3D no navegador: um mundo de montanhas novo a cada salto, inspirado no voo do Monte Emilius.">
 </head>
 <body>
 ${body}

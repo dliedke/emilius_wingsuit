@@ -12,6 +12,11 @@ const U = {
   uFogB: { value: 1 / 2300 },
   uTime: { value: 0 },
   uNoise: { value: null },
+  // main river: z0, amp1, period1, phase1 / amp2, period2, phase2
+  uRiv0: { value: new THREE.Vector4(-5820, 180, 2600, 0.4) },
+  uRiv1: { value: new THREE.Vector4(80, 1050, 1.7, 0) },
+  // altitude bands: tree-line shift, snow-line shift (relative to the classic massif)
+  uAlt: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 
 const COMMON_GLSL = /* glsl */`
@@ -25,6 +30,8 @@ uniform vec3 uGround;
 uniform float uFogA;
 uniform float uFogB;
 uniform float uTime;
+uniform vec4 uRiv0;
+uniform vec4 uRiv1;
 vec3 skyColor(vec3 v) {
   float y = v.y;
   float t = pow(clamp(y, 0.0, 1.0), 0.42);
@@ -54,7 +61,56 @@ vec3 applyFog(vec3 col, vec3 wp) {
   return mix(col, hazeColor(v), fogFactor(wp));
 }
 float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-float riverZ(float x) { return -5820.0 + 180.0 * sin(x / 2600.0 + 0.4) + 80.0 * sin(x / 1050.0 + 1.7); }
+float riverZ(float x) { return uRiv0.x + uRiv0.y * sin(x / uRiv0.z + uRiv0.w) + uRiv1.x * sin(x / uRiv1.y + uRiv1.z); }
+// landing aids, drawn with a minimum on-screen size so they read from altitude:
+// a dashed halo around the target, a target dot that never shrinks below a few
+// pixels, and the predicted touchdown ring while under canopy
+uniform vec4 uLZ;      // target x, z, halo radius, strength
+uniform vec4 uPred;    // predicted touchdown x, z, radius, alpha
+uniform vec3 uPredCol;
+vec3 landingAids(vec3 lit, vec3 world, vec3 V) {
+  if (uLZ.w <= 0.0 && uPred.w <= 0.0) return lit;
+  vec2 wp = world.xz;
+  float fw = max(length(fwidth(wp)), 1e-3) * 0.7;
+  float fogK = fogFactor(world) * 0.4;
+  vec3 hz = hazeColor(-V);
+  vec2 dl = wp - uLZ.xy;
+  float d = length(dl);
+  if (uLZ.w > 0.0 && d < uLZ.z + 12.0 * fw + 4.0) {
+    vec3 orange = mix(vec3(1.0, 0.36, 0.07) * 1.5, hz, fogK);
+    vec3 white = mix(vec3(1.0, 0.97, 0.9) * 1.25, hz, fogK);
+    float halfW = max(0.9, 1.2 * fw);
+    float ring = 1.0 - smoothstep(halfW - fw * 0.5, halfW + fw * 0.5, abs(d - uLZ.z));
+    float dash = step(0.4, fract(atan(dl.y, dl.x) / 6.2832 * 24.0 + uTime * 0.05));
+    ring *= mix(dash, 1.0, smoothstep(1.2, 3.0, fw));
+    float tint = (1.0 - smoothstep(uLZ.z - fw, uLZ.z, d)) * 0.13;
+    float dotR = 6.0 * fw;
+    float dotA = 1.0 - smoothstep(dotR - fw, dotR + fw, d);
+    float core = 1.0 - smoothstep(dotR * 0.4 - fw, dotR * 0.4 + fw, d);
+    lit = mix(lit, orange, clamp(tint + ring * 0.95, 0.0, 1.0) * uLZ.w);
+    lit = mix(lit, mix(orange, white, core), dotA * uLZ.w);
+  }
+  if (uPred.w > 0.0) {
+    vec2 dp = wp - uPred.xy;
+    float dd = length(dp);
+    float R = max(uPred.z, 13.0 * fw);
+    float halfW = max(0.45, 1.5 * fw);
+    float ring = 1.0 - smoothstep(halfW - fw * 0.5, halfW + fw * 0.5, abs(dd - R));
+    float edgeO = 1.0 - smoothstep(halfW * 2.2 - fw * 0.5, halfW * 2.2 + fw * 0.5, abs(dd - R));
+    float cR = max(0.9, 2.6 * fw);
+    float cDot = 1.0 - smoothstep(cR - fw * 0.5, cR + fw * 0.5, dd);
+    float cO = 1.0 - smoothstep(cR * 1.7 - fw * 0.5, cR * 1.7 + fw * 0.5, dd);
+    // four ticks pointing inward
+    float ang = atan(dp.y, dp.x);
+    float tick = (1.0 - smoothstep(0.05, 0.1, abs(fract(ang / 1.5708 + 0.5) - 0.5))) * step(R * 0.5, dd) * step(dd, R);
+    float fill = (1.0 - smoothstep(R - fw, R, dd)) * 0.16;
+    vec3 pc = mix(uPredCol, hz, fogK);
+    lit = mix(lit, pc, fill * uPred.w);
+    lit = mix(lit, vec3(0.02, 0.03, 0.03), max(edgeO, cO) * 0.55 * uPred.w);
+    lit = mix(lit, pc, clamp(ring + cDot + tick * 0.9, 0.0, 1.0) * uPred.w);
+  }
+  return lit;
+}
 `;
 
 // --------------------------------------------------------------- terrain
@@ -112,9 +168,7 @@ uniform vec4 uHole;
 uniform vec3 cRock, cRock2, cRockRed, cScree, cGrass, cMeadow, cForest, cSnow, cField1, cField2, cField3, cRoad;
 uniform vec4 uC0; uniform vec3 uC0r; uniform vec3 uC0f; uniform vec3 uC0u;
 uniform vec4 uC1; uniform vec3 uC1r; uniform vec3 uC1f; uniform vec3 uC1u; uniform vec2 uC1s;
-uniform vec4 uLZ;      // target x, z, halo radius, strength
-uniform vec4 uPred;    // predicted touchdown x, z, radius, alpha
-uniform vec3 uPredCol;
+uniform vec4 uAlt;
 varying vec3 vWorld;
 varying vec2 vUV;
 #include <logdepthbuf_pars_fragment>
@@ -203,10 +257,11 @@ void main() {
   rock *= 0.62 + 0.46 * (strata * 0.5 + 0.5) * (0.4 + nC) + 0.3 * (nD - 0.5);
   rock *= 0.75 + 0.5 * smoothstep(0.25, 0.75, n1.a);
   vec3 scree = mix(cScree, cRockRed * 1.2, 0.3 * smoothstep(0.5, 0.85, nB)) * (0.82 + 0.3 * nC + 0.22 * (nD - 0.5));
-  vec3 grass = mix(cMeadow, cGrass, smoothstep(1350.0, 2250.0, h + (nB - 0.5) * 500.0));
+  float hT = h - uAlt.x, hS = h - uAlt.y;
+  vec3 grass = mix(cMeadow, cGrass, smoothstep(1350.0, 2250.0, hT + (nB - 0.5) * 500.0));
   grass *= 0.8 + 0.35 * nC + 0.12 * (nD - 0.5);
-  float highW = smoothstep(2050.0, 2550.0, h + (nB - 0.5) * 500.0);
-  float alpineBare = smoothstep(2650.0, 2950.0, h + (nB - 0.5) * 300.0 + (nC - 0.5) * 120.0);
+  float highW = smoothstep(2050.0, 2550.0, hT + (nB - 0.5) * 500.0);
+  float alpineBare = smoothstep(2650.0, 2950.0, hS + (nB - 0.5) * 300.0 + (nC - 0.5) * 120.0);
   float rockW = smoothstep(0.27 - 0.07 * highW, 0.4 - 0.08 * highW, slope + (nA - 0.5) * 0.22 + (nC - 0.5) * 0.12);
   float screeW = clamp(max(max(sp.b * 1.2, highW * smoothstep(0.05, 0.14, slope + (nC - 0.5) * 0.12)), alpineBare), 0.0, 1.0);
   rockW = max(rockW, alpineBare * smoothstep(0.55, 0.8, nA + nD * 0.3) * 0.8);
@@ -253,49 +308,7 @@ void main() {
   float nh = max(dot(Nd, Hh), 0.0);
   lit += uSunCol * (snow * pow(nh, 60.0) * 0.22 + rockW * pow(nh, 18.0) * 0.025) * sunVis * shP;
   lit = applyFog(lit, vWorld);
-  // landing aids, drawn with a minimum on-screen size so they read from altitude:
-  // a dashed halo around the target, a target dot that never shrinks below a few
-  // pixels, and the predicted touchdown ring while under canopy
-  if (uLZ.w > 0.0 || uPred.w > 0.0) {
-    float fw = max(length(fwidth(wp)), 1e-3) * 0.7;
-    float fogK = fogFactor(vWorld) * 0.4;
-    vec3 hz = hazeColor(-V);
-    vec2 dl = wp - uLZ.xy;
-    float d = length(dl);
-    if (uLZ.w > 0.0 && d < uLZ.z + 12.0 * fw + 4.0) {
-      vec3 orange = mix(vec3(1.0, 0.36, 0.07) * 1.5, hz, fogK);
-      vec3 white = mix(vec3(1.0, 0.97, 0.9) * 1.25, hz, fogK);
-      float halfW = max(0.9, 1.2 * fw);
-      float ring = 1.0 - smoothstep(halfW - fw * 0.5, halfW + fw * 0.5, abs(d - uLZ.z));
-      float dash = step(0.4, fract(atan(dl.y, dl.x) / 6.2832 * 24.0 + uTime * 0.05));
-      ring *= mix(dash, 1.0, smoothstep(1.2, 3.0, fw));
-      float tint = (1.0 - smoothstep(uLZ.z - fw, uLZ.z, d)) * 0.13;
-      float dotR = 6.0 * fw;
-      float dotA = 1.0 - smoothstep(dotR - fw, dotR + fw, d);
-      float core = 1.0 - smoothstep(dotR * 0.4 - fw, dotR * 0.4 + fw, d);
-      lit = mix(lit, orange, clamp(tint + ring * 0.95, 0.0, 1.0) * uLZ.w);
-      lit = mix(lit, mix(orange, white, core), dotA * uLZ.w);
-    }
-    if (uPred.w > 0.0) {
-      vec2 dp = wp - uPred.xy;
-      float dd = length(dp);
-      float R = max(uPred.z, 13.0 * fw);
-      float halfW = max(0.45, 1.5 * fw);
-      float ring = 1.0 - smoothstep(halfW - fw * 0.5, halfW + fw * 0.5, abs(dd - R));
-      float edgeO = 1.0 - smoothstep(halfW * 2.2 - fw * 0.5, halfW * 2.2 + fw * 0.5, abs(dd - R));
-      float cR = max(0.9, 2.6 * fw);
-      float cDot = 1.0 - smoothstep(cR - fw * 0.5, cR + fw * 0.5, dd);
-      float cO = 1.0 - smoothstep(cR * 1.7 - fw * 0.5, cR * 1.7 + fw * 0.5, dd);
-      // four ticks pointing inward
-      float ang = atan(dp.y, dp.x);
-      float tick = (1.0 - smoothstep(0.05, 0.1, abs(fract(ang / 1.5708 + 0.5) - 0.5))) * step(R * 0.5, dd) * step(dd, R);
-      float fill = (1.0 - smoothstep(R - fw, R, dd)) * 0.16;
-      vec3 pc = mix(uPredCol, hz, fogK);
-      lit = mix(lit, pc, fill * uPred.w);
-      lit = mix(lit, vec3(0.02, 0.03, 0.03), max(edgeO, cO) * 0.55 * uPred.w);
-      lit = mix(lit, pc, clamp(ring + cDot + tick * 0.9, 0.0, 1.0) * uPred.w);
-    }
-  }
+  lit = landingAids(lit, vWorld, V);
   gl_FragColor = vec4(lit, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -391,6 +404,8 @@ uniform float uCell;
 uniform ivec2 uDims;
 uniform float uLevel;
 uniform float uRiver;
+uniform vec4 uLake;    // x, z, radius along the axis, length / width
+uniform vec2 uLakeDir;
 uniform vec3 cDeep, cShallow;
 varying vec3 vWorld;
 #include <logdepthbuf_pars_fragment>
@@ -424,7 +439,13 @@ void main() {
   float spec = pow(max(dot(R, uSunDir), 0.0), 420.0) * 2.6 + pow(max(dot(R, uSunDir), 0.0), 40.0) * 0.06;
   col += uSunCol * spec;
   float alpha = uRiver > 0.5 ? 0.92 : smoothstep(0.0, 1.4, depth) * 0.96;
+  if (uRiver < 0.5) {
+    vec2 q = wp - uLake.xy;
+    float u = dot(q, uLakeDir), v = (q.y * uLakeDir.x - q.x * uLakeDir.y) * uLake.w;
+    alpha *= 1.0 - smoothstep(uLake.z + 2.0, uLake.z + 10.0, length(vec2(u, v)));
+  }
   col = applyFog(col, vWorld);
+  col = landingAids(col, vWorld, V);
   gl_FragColor = vec4(col, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -558,6 +579,64 @@ void main() {
   float fog = fogFactor(vWorld);
   col = mix(col, hazeColor(-V), fog * 0.7);
   gl_FragColor = vec4(col, uFade);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
+
+// ------------------------------------------------------------------ birds
+// Instanced: position + scale, heading / pitch / bank / flap phase, kind + flap amplitude.
+// aWing: 0 on the body, 1 on the inner wing, 2 on the outer wing (bends more).
+const BIRD_VS = /* glsl */`
+attribute vec4 aP;
+attribute vec4 aQ;
+attribute vec2 aK;
+attribute float aWing;
+varying vec3 vWorld;
+varying float vKind;
+varying float vUp;
+#include <common>
+#include <logdepthbuf_pars_vertex>
+void main() {
+  vec3 p = position;
+  if (aWing > 0.5) {
+    float flap = sin(aQ.w) * aK.y;
+    float th = flap * (aWing > 1.5 ? 1.45 : 1.0);
+    float ax = abs(p.x);
+    p.y += sin(th) * ax;
+    p.x = sign(p.x) * cos(th) * ax;
+  }
+  vUp = p.y;
+  // bank (z), pitch (x), heading (y)
+  float cb = cos(aQ.z), sb = sin(aQ.z), cp = cos(aQ.y), sp = sin(aQ.y), ch = cos(aQ.x), sh = sin(aQ.x);
+  p = vec3(p.x * cb - p.y * sb, p.x * sb + p.y * cb, p.z);
+  p = vec3(p.x, p.y * cp - p.z * sp, p.y * sp + p.z * cp);
+  p = vec3(p.x * ch - p.z * sh, p.y, p.x * sh + p.z * ch);   // nose (-z) turns to (sin h, 0, -cos h)
+  // stay a few pixels wide far away so the flocks read
+  float d = distance(aP.xyz, cameraPosition);
+  float sc = aP.w * max(1.0, d * 0.0035 / aP.w);
+  vec3 wp = aP.xyz + p * sc;
+  vWorld = wp;
+  vKind = aK.x;
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+  #include <logdepthbuf_vertex>
+}
+`;
+const BIRD_FS = /* glsl */`
+${COMMON_GLSL}
+varying vec3 vWorld;
+varying float vKind;
+varying float vUp;
+#include <logdepthbuf_pars_fragment>
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 N = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  if (dot(N, cameraPosition - vWorld) < 0.0) N = -N;
+  vec3 base = vKind > 0.5 ? mix(vec3(0.24, 0.16, 0.09), vec3(0.42, 0.31, 0.19), smoothstep(-0.05, 0.1, vUp)) : vec3(0.035, 0.035, 0.04);
+  float ndl = max(dot(N, uSunDir), 0.0);
+  vec3 lit = base * (uSunCol * (0.25 + 0.75 * ndl) * 0.6 + mix(uGround, uSkyAmb, N.y * 0.5 + 0.5) * 1.1);
+  lit = applyFog(lit, vWorld);
+  gl_FragColor = vec4(lit, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

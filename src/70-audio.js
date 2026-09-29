@@ -48,7 +48,16 @@ function initAudio() {
   const fbp = ctx.createBiquadFilter(); fbp.type = 'bandpass'; fbp.frequency.value = 900; fbp.Q.value = 2;
   const fg = ctx.createGain(); fg.gain.value = 0;
   fl.connect(fbp); fbp.connect(fg); fg.connect(master);
-  AUDIO.n = { bp, wg, pan, hg, rg, trem, fg, fbp, lp };
+  // paramotor: a sawtooth two-stroke buzz plus propeller wash
+  const mo = ctx.createOscillator(); mo.type = 'sawtooth'; mo.frequency.value = 70;
+  const mlp = ctx.createBiquadFilter(); mlp.type = 'lowpass'; mlp.frequency.value = 900; mlp.Q.value = 1.5;
+  const mg = ctx.createGain(); mg.gain.value = 0;
+  mo.connect(mlp); mlp.connect(mg); mg.connect(master); mo.start();
+  const pw = src(1.6);
+  const pbp = ctx.createBiquadFilter(); pbp.type = 'bandpass'; pbp.frequency.value = 1300; pbp.Q.value = 0.9;
+  const pg = ctx.createGain(); pg.gain.value = 0;
+  pw.connect(pbp); pbp.connect(pg); pg.connect(master);
+  AUDIO.n = { bp, wg, pan, hg, rg, trem, fg, fbp, lp, mo, mlp, mg, pg };
   AUDIO.ready = true;
 }
 function setMute(muted) {
@@ -74,6 +83,11 @@ function updateAudio(dt, st) {
   n.trem.gain.setTargetAtTime(0.7 + 0.3 * Math.sin(t * (9 + k * 12)) * (0.4 + near), t, 0.02);
   n.fg.gain.setTargetAtTime(canopy * 0.05 + (phase === 'deploy' ? 0.2 : 0), t, 0.1);
   n.fbp.frequency.setTargetAtTime(700 + 400 * Math.sin(t * 13), t, 0.05);
+  const th = canopy * (st.thrust || 0);
+  n.mg.gain.setTargetAtTime(th * 0.075, t, 0.12);
+  n.pg.gain.setTargetAtTime(th * 0.06, t, 0.12);
+  n.mo.frequency.setTargetAtTime(58 + 62 * th + 3 * Math.sin(t * 17), t, 0.08);
+  n.mlp.frequency.setTargetAtTime(500 + 1300 * th, t, 0.1);
   if (n.pan.pan) n.pan.pan.setTargetAtTime(clamp(-st.bank * 0.5, -0.7, 0.7), t, 0.1);
   // whoosh when skimming terrain
   AUDIO.whooshT -= dt;

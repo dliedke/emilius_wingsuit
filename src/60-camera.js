@@ -12,10 +12,8 @@ function camNoise(t, seed) { return TC.noise(t * 1.7 + seed * 13.1, seed * 7.3 -
 function addTrauma(x) { CAM.trauma = Math.min(1, CAM.trauma + x); }
 
 function camKeepAboveGround(p, clearance) {
-  const g = groundHeight(p.x, p.z);
+  const g = surfaceHeight(p.x, p.z);
   if (p.y < g + clearance) p.y = g + clearance;
-  const water = lakeDist(p.x, p.z) < TC.LAKE.r + 5 ? TC.LAKE.level : -1e9;
-  if (p.y < water + 0.6) p.y = water + 0.6;
 }
 
 // cinematic shot planner (used by attract mode, replay and the "Cinema" camera)

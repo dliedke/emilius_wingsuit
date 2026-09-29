@@ -26,12 +26,54 @@ function store(key, val) {
   return null;
 }
 
-const SEED = 1337;
-const TC = makeTerrainCore(SEED);          // main-thread copy of the geography
+// ------------------------------------------------------------------ worlds
+// Every visit starts on a fresh random world; ?seed=N replays a given one.
+function urlSeed() {
+  try { const m = /[?&#]seed=(\d+)/.exec(location.search + location.hash); return m ? (+m[1] % 1000000) || 1 : 0; } catch (e) { return 0; }
+}
+function randomSeed() { return 1 + Math.floor(Math.random() * 999999); }
+let SEED = urlSeed() || randomSeed();
+let TC = makeTerrainCore(SEED);          // main-thread copy of the geography
 
-// sun: WSW, afternoon (azimuth 245°, elevation 36°)
-const SUN_AZ = 245 * DEG, SUN_EL = 36 * DEG;
-const SUN_DIR = new THREE.Vector3(Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.sin(SUN_EL), -Math.cos(SUN_AZ) * Math.cos(SUN_EL)).normalize();
+// sun direction (set per world by applyStyle)
+const SUN_DIR = new THREE.Vector3(0, 1, 0);
+function sunVector(az, el, out) { return out.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize(); }
+
+// Per-world look: light, season, snow and tree lines, rock colour, wind, haze, clouds
+let STYLE = null;
+function makeStyle(seed) {
+  const r = mulberry32(Math.imul(seed, 7919) + 17);
+  const rr = (a, b) => a + (b - a) * r();
+  const s = r();
+  const season = s < 0.5 ? 'summer' : s < 0.78 ? 'autumn' : 'spring';
+  const rocks = ['grey', 'warm', 'dark', 'pale'][Math.floor(r() * 4)];
+  const snowLine = season === 'spring' ? rr(2450, 2800) : season === 'autumn' ? rr(2850, 3150) : rr(2950, 3250);
+  const windDir = r() * Math.PI * 2, windSpd = rr(0.6, 2.8);
+  return {
+    season, rocks, snowLine,
+    treeLine: rr(1900, 2250),
+    sunAz: rr(120, 285) * DEG, sunEl: rr(22, 52) * DEG,
+    wind: [Math.cos(windDir) * windSpd, Math.sin(windDir) * windSpd],
+    haze: rr(0.72, 1.35),
+    clouds: rr(0.45, 1.3),
+    larchMix: season === 'autumn' ? rr(0.3, 0.6) : rr(0.12, 0.3),
+  };
+}
+
+// Alpine-sounding name for the peak of each world
+function worldName(seed) {
+  const r = mulberry32((Math.imul(seed, 2654435761) ^ 0x51ed27) >>> 0);
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  const A = ['Ar', 'Bel', 'Cor', 'Dor', 'Em', 'Fal', 'Gran', 'Lau', 'Mar', 'Nev', 'Or', 'Pal', 'Ros', 'Sel', 'Tor', 'Val', 'Ver', 'Zin', 'Aur', 'Cal', 'Fen', 'Lis', 'Mon', 'Riv', 'Sol', 'Tal', 'Bris', 'Clar', 'Gel', 'Oss', 'Nor', 'Sur', 'Ard', 'Vel'];
+  const M = ['', '', 'e', 'i', 'o', 'a'];
+  const E = ['na', 'lio', 'rena', 'vius', 'dina', 'nello', 'rus', 'tina', 'sio', 'lara', 'mont', 'dora', 'neva', 'rin', 'dal', 'cia', 'lius', 'gna', 'ssa', 'res'];
+  const base = pick(A) + pick(M) + pick(E);
+  const pre = pick(['Monte', 'Punta', 'Cima', 'Becca', 'Pizzo', 'Mont', 'Pointe', 'Aiguille', 'Dent', 'Piz', 'Corno', 'Testa', 'Grand']);
+  const vowel = /^[AEIOU]/.test(base);
+  if (['Pointe', 'Aiguille', 'Dent'].includes(pre) && r() < 0.7) return `${pre} ${vowel ? "d'" + base : 'de ' + base}`;
+  if (['Punta', 'Cima', 'Becca', 'Testa'].includes(pre) && r() < 0.4) return `${pre} di ${base}`;
+  return `${pre} ${base}`;
+}
 
 const IS_TOUCH = (('ontouchstart' in window) || navigator.maxTouchPoints > 0) && Math.min(screen.width, screen.height) < 900;
 const QUALITY_PRESETS = {

@@ -93,10 +93,31 @@ class Jumper {
     };
     for (const s of ['L', 'R']) this.wings.push({ side: s, top: wing(10, 6), bot: wing(10, 6), kind: 'arm' });
     this.legWing = { top: wing(6, 8), bot: wing(6, 8) };
+    // paramotor for the canopy: cage, hub and propeller behind the harness (body +Y is the back)
+    this.motor = new THREE.Group();
+    const cageMat = stdMat({ color: 0xc9ced3, roughness: 0.35, metalness: 0.8 });
+    const cage = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.022, 6, 40), cageMat);
+    cage.rotation.x = Math.PI / 2; this.motor.add(cage);
+    for (let i = 0; i < 4; i++) {
+      const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.62, 4), cageMat);
+      sp.rotation.z = Math.PI / 2; sp.rotation.y = i * Math.PI / 4 * 2 + Math.PI / 4;
+      sp.position.set(Math.cos(i * Math.PI / 2 + Math.PI / 4) * 0.31, 0, -Math.sin(i * Math.PI / 2 + Math.PI / 4) * 0.31);
+      this.motor.add(sp);
+    }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.2, 10), stdMat({ color: 0x2a2d31, roughness: 0.5, metalness: 0.6 }));
+    hub.position.y = -0.08; this.motor.add(hub);
+    this.prop = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.015, 0.075), stdMat({ color: 0x1b1d20, roughness: 0.6 }));
+    this.prop.position.y = 0.05; this.motor.add(this.prop);
+    this.propDisc = new THREE.Mesh(new THREE.CircleGeometry(0.55, 32), new THREE.MeshBasicMaterial({ color: 0x9aa3ab, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    this.propDisc.rotation.x = Math.PI / 2; this.propDisc.position.y = 0.05; this.motor.add(this.propDisc);
+    this.motor.position.set(0, 0.36, -0.3);
+    this.motor.visible = false;
+    this.root.add(this.motor);
     this.J = {};
     for (const k of Object.keys(POSE_FLY)) this.J[k] = new THREE.Vector3();
     this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._q = new THREE.Quaternion();
-    this.pose = { fly: 0, hang: 0, roll: 0, pitch: 0, speed: 0, brakeL: 0, brakeR: 0, t: 0 };
+    this.pose = { fly: 0, hang: 0, roll: 0, pitch: 0, speed: 0, brakeL: 0, brakeR: 0, t: 0, thrust: 0 };
+    this.propA = 0;
   }
   setLimb(m, a, b) {
     const d = this._a.subVectors(b, a);
@@ -151,6 +172,14 @@ class Jumper {
     }
     this.head.position.copy(J.head);
     this.head.rotation.x = -0.35 * P.fly;
+    // paramotor: shown under the canopy, the propeller spins up with thrust
+    this.motor.visible = P.hang > 0.6;
+    if (this.motor.visible) {
+      this.propA += dt * (3 + 75 * P.thrust);
+      this.prop.rotation.y = this.propA;
+      this.propDisc.material.opacity = 0.32 * smoothstep(0.15, 0.6, P.thrust);
+      this.prop.visible = P.thrust < 0.45;
+    }
     // arm wings
     const spread = P.fly;
     for (const w of this.wings) {
