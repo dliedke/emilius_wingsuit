@@ -126,6 +126,7 @@ uniform vec4 uHole;
 uniform float uIsFar;
 attribute vec2 aChunk;
 varying vec3 vWorld;
+varying vec3 vRel;   // world position relative to the camera: full float precision up close
 varying vec2 vUV;
 #include <common>
 #include <logdepthbuf_pars_vertex>
@@ -153,6 +154,7 @@ void main() {
   }
   wp.y -= position.y * uSkirt;
   vWorld = wp;
+  vRel = wp - cameraPosition;
   vUV = (vec2(t) + 0.5) / vec2(uDims);
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
   #include <logdepthbuf_vertex>
@@ -170,6 +172,7 @@ uniform vec4 uC0; uniform vec3 uC0r; uniform vec3 uC0f; uniform vec3 uC0u;
 uniform vec4 uC1; uniform vec3 uC1r; uniform vec3 uC1f; uniform vec3 uC1u; uniform vec2 uC1s;
 uniform vec4 uAlt;
 varying vec3 vWorld;
+varying vec3 vRel;
 varying vec2 vUV;
 #include <logdepthbuf_pars_fragment>
 
@@ -238,10 +241,17 @@ void main() {
   vec4 n3 = texture2D(uNoise, wp * (1.0 / 1530.0) + 0.71);
   float slope = 1.0 - N.y;
   // bump: layered noise heights (m), turned into a normal with screen derivatives
-  float f0 = 1.0 - smoothstep(25.0, 240.0, dist);
-  float hb = (n0.r - 0.5) * 0.35 * f0 + (n1.r - 0.5) * 3.0 * fNear + (n2.r - 0.5) * 16.0 * fMid;
+  // each layer only where its noise texels are no bigger than a pixel or two: magnified
+  // up close, their fine octaves tilt the normal by tens of degrees per texel, which
+  // turned the ground next to the camera black and speckled
+  float f0 = smoothstep(6.0, 25.0, dist) * (1.0 - smoothstep(25.0, 240.0, dist));
+  float f1 = smoothstep(40.0, 110.0, dist) * fNear, f2 = smoothstep(200.0, 600.0, dist) * fMid;
+  float hb = (n0.r - 0.5) * 0.35 * f0 + (n1.r - 0.5) * 3.0 * f1 + (n2.r - 0.5) * 16.0 * f2;
   hb *= 0.35 + 0.65 * smoothstep(0.05, 0.5, slope);
-  vec3 dpx = dFdx(vWorld), dpy = dFdy(vWorld);
+  // screen derivatives of the camera-relative position: world coordinates (thousands of
+  // metres) are too coarse for the millimetre steps between pixels next to the camera,
+  // which flipped the bumped normal into dark speckles and rings
+  vec3 dpx = dFdx(vRel), dpy = dFdy(vRel);
   float dhx = dFdx(hb), dhy = dFdy(hb);
   vec3 r1 = cross(dpy, N), r2 = cross(N, dpx);
   float det = dot(dpx, r1);
@@ -529,9 +539,13 @@ varying vec3 vWorld;
 #include <logdepthbuf_pars_fragment>
 void main() {
   #include <logdepthbuf_fragment>
-  vec2 auv = (vUv + vec2(mod(vIdx, 2.0), floor(vIdx / 2.0))) * 0.5;
+  // vIdx is a whole number per puff, but interpolation can hand back 1.9999999:
+  // round it, or neighbouring pixels pick different atlas tiles (blinking blocks)
+  float idx = floor(vIdx + 0.5);
+  vec2 auv = (vUv + vec2(mod(idx, 2.0), floor(idx * 0.5))) * 0.5;
   vec4 t = texture2D(uTex, auv);
-  float a = t.a * vAlpha;
+  // a round fade inside the quad: whatever the mip level, never a straight edge
+  float a = t.a * vAlpha * (1.0 - smoothstep(0.36, 0.47, length(vUv - 0.5)));
   if (a < 0.004) discard;
   float lit = clamp(vShade * 0.8 + (t.r - 0.5) * 0.7 + 0.1, 0.0, 1.0);
   vec3 col = mix(uSkyAmb * 1.05 + uGround * 0.4, uSunCol * 0.62 + uSkyAmb * 0.35, lit);

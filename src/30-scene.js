@@ -429,6 +429,9 @@ function cloudTexture() {
       const r = Math.hypot(u, v * 1.15 + (v > 0 ? v * 0.25 : 0));
       let a = (1 - r * r) * 1.05 + (n - 0.5) * 1.3;
       a = clamp(a, 0, 1); a = a * a * (3 - 2 * a);
+      // fully clear well inside the tile border: no hard quad edges, no bleeding
+      // from the neighbouring puff in the smaller mip levels
+      a *= 1 - smoothstep(0.72, 0.9, Math.max(Math.abs(u), Math.abs(v), Math.hypot(u, v) * 0.8));
       const light = clamp(0.55 + (n - 0.5) * 0.9 - v * 0.25, 0, 1);
       const o = ((oy + y) * N * 2 + ox + x) * 4;
       img.data[o] = light * 255; img.data[o + 1] = light * 255; img.data[o + 2] = light * 255; img.data[o + 3] = a * 255;
@@ -466,6 +469,22 @@ function cloudClusters() {
   }
   return out;
 }
+// A puff is a camera-facing quad: wherever it cuts through a slope the two
+// surfaces sit at the same depth and the depth test flickers between them
+// (blinking stripes and blocks). Keep every puff's bounding sphere clear of
+// the terrain: shrink it until it fits, or drop it (returns 0).
+function puffFit(x, y, z, size, stretch) {
+  for (const k of [1, 0.8, 0.62, 0.48]) {
+    const R0 = 0.5 * size * k * stretch * 1.05;
+    let ok = y - R0 > groundHeight(x, z) + 6;
+    for (let j = 0; ok && j < 16; j++) {
+      const d = R0 * (j < 8 ? 0.55 : 1), a = (j % 8) * Math.PI / 4 + (j < 8 ? 0 : Math.PI / 8);
+      ok = y - Math.sqrt(Math.max(0, R0 * R0 - d * d)) > groundHeight(x + Math.cos(a) * d, z + Math.sin(a) * d) + 6;
+    }
+    if (ok) return size * k;
+  }
+  return 0;
+}
 function buildClouds() {
   if (!CLOUD_TEX) { CLOUD_TEX = cloudTexture(); KEEP_TEX.add(CLOUD_TEX); }
   const mat = new THREE.ShaderMaterial({
@@ -478,18 +497,24 @@ function buildClouds() {
   const clusters = cloudClusters();
   R.cloudClusters = [];
   for (const [x, y, z, rx, ry, n0, ps] of clusters) {
-    const n = Math.max(6, Math.round(n0 * Q.clouds));
-    const aPuff = new Float32Array(n * 4), aInfo = new Float32Array(n * 4);
-    for (let i = 0; i < n; i++) {
+    const n1 = Math.max(6, Math.round(n0 * Q.clouds));
+    const aPuff = new Float32Array(n1 * 4), aInfo = new Float32Array(n1 * 4);
+    let n = 0;
+    for (let i = 0; i < n1; i++) {
       const a = rng() * Math.PI * 2, r = Math.sqrt(rng());
       const ox = Math.cos(a) * r * rx, oz = Math.sin(a) * r * rx * 0.8;
       const oy = (rng() - 0.3) * ry * (1 - r * 0.6);
-      aPuff[i * 4] = x + ox; aPuff[i * 4 + 1] = y + oy; aPuff[i * 4 + 2] = z + oz;
-      aPuff[i * 4 + 3] = ps * (0.6 + rng() * 0.8) * (1.15 - r * 0.4);
+      const px = x + ox, py = y + oy, pz = z + oz, stretch = ps > 400 ? 2.6 : ps > 180 ? 1.8 : 1;
+      const size = puffFit(px, py, pz, ps * (0.6 + rng() * 0.8) * (1.15 - r * 0.4), stretch);
       const dir = new THREE.Vector3(ox, oy * 2.5, oz).normalize();
       const shade = clamp(0.45 + 0.4 * dir.dot(SUN_DIR) + 0.35 * (oy / ry), 0.12, 1);
-      aInfo[i * 4] = Math.floor(rng() * 4) + (ps > 400 ? 0.5 : ps > 180 ? 0.25 : 0); aInfo[i * 4 + 1] = (rng() - 0.5) * 0.5; aInfo[i * 4 + 2] = shade; aInfo[i * 4 + 3] = 0.5 + rng() * 0.4;
+      const idx = Math.floor(rng() * 4), rot = (rng() - 0.5) * 0.5, op = 0.5 + rng() * 0.4;
+      if (!size) continue;   // no room between the slopes: drop it
+      aPuff[n * 4] = px; aPuff[n * 4 + 1] = py; aPuff[n * 4 + 2] = pz; aPuff[n * 4 + 3] = size;
+      aInfo[n * 4] = idx + (stretch - 1) / 3.2; aInfo[n * 4 + 1] = rot; aInfo[n * 4 + 2] = shade; aInfo[n * 4 + 3] = op;
+      n++;
     }
+    if (!n) continue;
     const g = new THREE.InstancedBufferGeometry();
     g.index = quad.index; g.attributes.position = quad.attributes.position; g.attributes.uv = quad.attributes.uv;
     g.setAttribute('aPuff', new THREE.InstancedBufferAttribute(aPuff, 4));
