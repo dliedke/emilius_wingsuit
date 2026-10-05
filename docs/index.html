@@ -2521,13 +2521,13 @@ float caster(vec3 wp, vec4 c, vec3 r, vec3 f, vec3 u, vec2 size) {
   if (t <= 0.05) return 1.0;
   vec3 q = wp + uSunDir * t - c.xyz;
   vec2 lc = vec2(dot(q, r), dot(q, f));
-  float blur = 0.0093 * t + 0.035;
+  float blur = min(0.0093 * t * 0.4, 0.55) + 0.05;
   float d;
   if (c.w < 1.5) d = sdSuit(lc);
   else if (c.w < 2.5) { vec2 dd = abs(lc) - size; d = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0); }
   else d = length(lc) - size.x;
   float occ = 1.0 - smoothstep(-blur, blur, d);
-  occ *= 1.0 - smoothstep(280.0, 650.0, t);
+  occ *= 1.0 - smoothstep(700.0, 1500.0, t);
   return 1.0 - occ * 0.88;
 }
 
@@ -2631,7 +2631,8 @@ void main() {
   float shP = 1.0;
   if (uIsFar < 0.5) shP = caster(vWorld, uC0, uC0r, uC0f, uC0u, vec2(0.0)) * caster(vWorld, uC1, uC1r, uC1f, uC1u, uC1s);
   vec3 sunL = uSunCol * ndl * sunVis * shP;
-  vec3 ambL = mix(uGround, uSkyAmb, Nd.y * 0.5 + 0.5) * (ao * ao);
+  // the shadow also dims the sky light a little, so it still reads on terrain already in mountain shade
+  vec3 ambL = mix(uGround, uSkyAmb, Nd.y * 0.5 + 0.5) * (ao * ao) * (1.0 - (1.0 - shP) * 0.5);
   vec3 lit = col * (sunL + ambL);
   vec3 V = normalize(cameraPosition - vWorld);
   vec3 Hh = normalize(V + uSunDir);
