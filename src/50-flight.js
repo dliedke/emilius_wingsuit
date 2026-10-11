@@ -9,24 +9,30 @@ const WS = {
 const WIND = new THREE.Vector3(1.4, 0, 0.5);   // valley breeze (set per world)
 const G = 9.81;
 const FUEL_TIME = 30;                            // seconds of full thrust from the paramotor
+const JET_ACC = 11;                              // wingsuit jetpack push (m/s²), no fuel limit
 function tab(xs, ys, x) {
   if (x <= xs[0]) return ys[0];
   for (let i = 0; i < xs.length - 1; i++) if (x <= xs[i + 1]) return lerp(ys[i], ys[i + 1], (x - xs[i]) / (xs[i + 1] - xs[i]));
   return ys[ys.length - 1];
 }
 
-const SIM = {
-  phase: 'menu', time: 0, phaseT: 0,
-  pos: new THREE.Vector3(), vel: new THREE.Vector3(), prev: new THREE.Vector3(),
-  alpha: 12, bank: 0, heading: 0, inflate: 0,
-  deployT: 0, openShock: 0,
-  u: 0, w: 0, yawRate: 0, flare: 0, toggleL: 0, toggleR: 0, swingRoll: 0, swingPitch: 0,
-  thrust: 0, fuel: 1,
-  quat: new THREE.Quaternion(), liftDir: new THREE.Vector3(0, 1, 0),
-  agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0,
-  outcome: null, crashCause: null, landing: null,
-};
-const INPUT = { pitch: 0, roll: 0, brakeL: 0, brakeR: 0, thrust: 0, deploy: false, jump: false };
+// one pilot's flight state; the AI rival gets its own copy and is swapped in to share the same physics
+function makeSim() {
+  return {
+    phase: 'menu', time: 0, phaseT: 0,
+    pos: new THREE.Vector3(), vel: new THREE.Vector3(), prev: new THREE.Vector3(),
+    alpha: 12, bank: 0, heading: 0, inflate: 0,
+    deployT: 0, openShock: 0,
+    u: 0, w: 0, yawRate: 0, flare: 0, toggleL: 0, toggleR: 0, swingRoll: 0, swingPitch: 0,
+    thrust: 0, fuel: 1, cutaways: 0,
+    quat: new THREE.Quaternion(), liftDir: new THREE.Vector3(0, 1, 0),
+    agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0,
+    outcome: null, crashCause: null, landing: null,
+  };
+}
+let SIM = makeSim();
+function makeInput() { return { pitch: 0, roll: 0, brakeL: 0, brakeR: 0, thrust: 0, deploy: false, cutaway: false, jump: false }; }
+const INPUT = makeInput();
 
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _m4 = new THREE.Matrix4();
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -233,8 +239,29 @@ function scrape(floor, feet, kind) {
   EVENTS.push({ type: 'scrape', kind });
 }
 
+// jetpack: pushes along the body axis (a little above the flight path) while the button is held
+function stepJet(dt, inp) {
+  const s = SIM;
+  s.thrust = damp(s.thrust, SETTINGS.jetpack ? clamp(inp.thrust || 0, 0, 1) : 0, 6, dt);
+  if (s.thrust < 0.002) return;
+  const V = s.vel.length();
+  if (V > 0.5) _v1.copy(s.vel).divideScalar(V); else headingVec(s.heading, _v1);
+  const a = s.alpha * DEG * smoothstep(0, 1, s.inflate);
+  _v1.multiplyScalar(Math.cos(a)).addScaledVector(s.liftDir, Math.sin(a));
+  s.vel.addScaledVector(_v1, JET_ACC * s.thrust * dt);
+}
+// cut the canopy away and fly the wingsuit again (the next deploy is the reserve)
+function cutaway() {
+  const s = SIM;
+  s.phase = 'fly'; s.phaseT = 0;
+  s.inflate = 0.2; s.alpha = WS.aTrim; s.bank = 0; s.thrust = 0;
+  s.toggleL = s.toggleR = 0; s.flare = 0; s.yawRate = 0; s.swingRoll = s.swingPitch = 0;
+  s.cutaways++;
+  EVENTS.push({ type: 'cutaway' });
+}
+
 const EVENTS = [];
-function physicsStep(dt) {
+function physicsStep(dt, inp = INPUT) {
   const s = SIM;
   s.prev.copy(s.pos);
   s.time += dt; s.phaseT += dt;
@@ -246,10 +273,10 @@ function physicsStep(dt) {
   } else if (s.phase === 'fly') {
     s.airT += dt;
     // stick input fades in over the first seconds so the exit can't be ruined by a held key
-    const ease = smoothstep(0, 1.6, s.phaseT);
-    ASSIST_INP.pitch = INPUT.pitch * ease + 0.1 * (1 - ease);
-    ASSIST_INP.roll = INPUT.roll * ease;
-    if (SETTINGS.assist) {
+    const ease = s.cutaways ? 1 : smoothstep(0, 1.6, s.phaseT);
+    ASSIST_INP.pitch = inp.pitch * ease + 0.1 * (1 - ease);
+    ASSIST_INP.roll = inp.roll * ease;
+    if (SETTINGS.assist || s.forceAssist) {
       const danger = groundDanger(s);
       s.warn = danger;
       if (danger > 0) {
@@ -259,12 +286,15 @@ function physicsStep(dt) {
       }
     }
     stepWingsuit(dt, ASSIST_INP);
-    if (INPUT.deploy) { INPUT.deploy = false; s.phase = 'deploy'; s.phaseT = 0; s.deployT = 0; s.deployAlt = s.agl; EVENTS.push({ type: 'deploy' }); }
+    stepJet(dt, inp);
+    if (inp.deploy) { inp.deploy = false; s.thrust = 0; s.phase = 'deploy'; s.phaseT = 0; s.deployT = 0; s.deployAlt = s.agl; EVENTS.push({ type: 'deploy' }); }
   } else if (s.phase === 'deploy') {
-    stepDeploy(dt, INPUT);
+    stepDeploy(dt, inp);
   } else if (s.phase === 'canopy') {
-    stepCanopy(dt, INPUT);
+    if (inp.cutaway) { inp.cutaway = false; cutaway(); }
+    else stepCanopy(dt, inp);
   }
+  inp.cutaway = false;
   // collisions
   if (s.phase === 'exit' || s.phase === 'fly' || s.phase === 'deploy' || s.phase === 'canopy') {
     const g0 = groundHeight(s.pos.x, s.pos.z);
@@ -276,7 +306,7 @@ function physicsStep(dt) {
     s.agl = s.pos.y - feet - floor;
     s.scrapeCool = Math.max(0, (s.scrapeCool || 0) - dt);
     const grace = (s.phase === 'exit' || s.phase === 'fly') && s.airT < 4.5;
-    const assisted = SETTINGS.assist && (s.phase === 'exit' || s.phase === 'fly');
+    const assisted = (SETTINGS.assist || s.forceAssist) && (s.phase === 'exit' || s.phase === 'fly');
     if (s.pos.y - feet <= floor) {
       if (s.phase === 'canopy') { s.pos.y = floor + feet; land(water, g); }
       else if ((grace || assisted) && !water) {
@@ -324,7 +354,9 @@ function land(water, g) {
 
 // ------------------------------------------------------------ autopilot
 // Flies the line: used for the menu's attract mode and the tests.
-const AUTO = { on: false, gate: 0, hold: null };
+// nudge: steer the flight path onto the gate centres (attract mode, the AI rival);
+// jetV: the rival lights its jetpack below this speed or when it sinks under the line
+let AUTO = { on: false, gate: 0, hold: null, nudge: false, jetV: 0 };
 // where to burn height before the final: over the lowest ground next to the target
 // (so a mountain shelf's slope is never in the way), a little downwind if possible
 function holdingPoint() {
@@ -372,8 +404,9 @@ function autopilot(inp, gates, dt) {
       if (clr < 18) p = Math.max(p, clamp(1 - clr / 18, 0.25, 0.8));
     }
     inp.pitch = p;
+    inp.thrust = AUTO.jetV && SETTINGS.jetpack && s.phase === 'fly' && (V < AUTO.jetV || s.pos.y < ty - 30) ? 1 : 0;
     // demo-only assist: nudge the flight path onto the gate centre
-    if (g && (AUTO.on || GAME_STATE_IS_MENU())) {
+    if (g && (AUTO.on || AUTO.nudge || GAME_STATE_IS_MENU())) {
       const ex = g.x - s.pos.x, ey = g.y - s.pos.y, ez = g.z - s.pos.z;
       const along = ex * g.n.x + ey * g.n.y + ez * g.n.z;
       if (along > 0 && along < 260) {

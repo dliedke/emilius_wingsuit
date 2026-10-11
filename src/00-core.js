@@ -87,6 +87,8 @@ const SETTINGS = Object.assign({
   invert: false,
   smoke: true,
   assist: true,
+  jetpack: true,
+  race: true,
   cam: 0,
 }, store('settings') || {});
 if (!QUALITY_PRESETS[SETTINGS.quality]) SETTINGS.quality = 'media';
