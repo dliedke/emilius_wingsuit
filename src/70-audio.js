@@ -58,7 +58,15 @@ function initAudio() {
   const pbp = ctx.createBiquadFilter(); pbp.type = 'bandpass'; pbp.frequency.value = 1300; pbp.Q.value = 0.9;
   const pg = ctx.createGain(); pg.gain.value = 0;
   pw.connect(pbp); pbp.connect(pg); pg.connect(master);
-  AUDIO.n = { bp, wg, pan, hg, rg, trem, fg, fbp, lp, mo, mlp, mg, pg };
+  // wingsuit jetpack: a roar of filtered noise with a turbine whine on top
+  const jr = src(0.9);
+  const jbp = ctx.createBiquadFilter(); jbp.type = 'bandpass'; jbp.frequency.value = 450; jbp.Q.value = 0.6;
+  const jg = ctx.createGain(); jg.gain.value = 0;
+  jr.connect(jbp); jbp.connect(jg); jg.connect(master);
+  const jw = ctx.createOscillator(); jw.type = 'triangle'; jw.frequency.value = 1800;
+  const jwg = ctx.createGain(); jwg.gain.value = 0;
+  jw.connect(jwg); jwg.connect(master); jw.start();
+  AUDIO.n = { bp, wg, pan, hg, rg, trem, fg, fbp, lp, mo, mlp, mg, pg, jbp, jg, jw, jwg };
   AUDIO.ready = true;
 }
 function setMute(muted) {
@@ -89,6 +97,11 @@ function updateAudio(dt, st) {
   n.pg.gain.setTargetAtTime(th * 0.06, t, 0.12);
   n.mo.frequency.setTargetAtTime(58 + 62 * th + 3 * Math.sin(t * 17), t, 0.08);
   n.mlp.frequency.setTargetAtTime(500 + 1300 * th, t, 0.1);
+  const jet = air * (st.jet || 0);
+  n.jg.gain.setTargetAtTime(jet * 0.32, t, 0.06);
+  n.jbp.frequency.setTargetAtTime(330 + 520 * jet + 40 * Math.sin(t * 23), t, 0.05);
+  n.jwg.gain.setTargetAtTime(jet * 0.014, t, 0.08);
+  n.jw.frequency.setTargetAtTime(1500 + 1100 * jet, t, 0.15);
   if (n.pan.pan) n.pan.pan.setTargetAtTime(clamp(-st.bank * 0.5, -0.7, 0.7), t, 0.1);
   // whoosh when skimming terrain
   AUDIO.whooshT -= dt;
@@ -142,6 +155,8 @@ const SFX = {
   crash() { noiseBurst(0.9, 180, 1.0, 'lowpass'); noiseBurst(0.5, 1200, 0.3, 'bandpass', 0.02); tone(55, 0.8, 'sine', 0.5); },
   splash() { noiseBurst(1.2, 1600, 0.5, 'bandpass', 0, 0.6); noiseBurst(0.6, 300, 0.4, 'lowpass'); },
   click() { tone(1200, 0.05, 'triangle', 0.05); },
+  boost() { whoosh(0.5); tone(523.3, 0.18, 'triangle', 0.1); tone(784, 0.18, 'triangle', 0.1, 0.06); tone(1046.5, 0.35, 'triangle', 0.1, 0.12); },
+  cutaway() { noiseBurst(0.18, 2600, 0.35, 'highpass'); tone(330, 0.12, 'square', 0.05); noiseBurst(0.6, 700, 0.2, 'bandpass', 0.05, 1.4); },
   birds() {
     const n = 4 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) chirp(2500 + Math.random() * 900, 1500 + Math.random() * 500, 0.1 + Math.random() * 0.08, 0.03 + Math.random() * 0.02, i * 0.09 + Math.random() * 0.1);

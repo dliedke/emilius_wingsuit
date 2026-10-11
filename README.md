@@ -20,8 +20,15 @@ Inspirado no vídeo [“My Most Breathtaking Wingsuit Flight Ever – Monte Emil
   ainda conta como pouso, um "Splash!") ou uma **encosta alta da montanha**, com um refúgio.
 - Estação do ano, linha de neve e de árvores, cor da rocha, posição do sol, vento, névoa e nuvens variam por mundo.
 - Bandos de gralhas-alpinas na frente da saída e ao longo da linha, que se espalham gritando quando você passa perto, e águias girando nas térmicas.
+- **Anéis de velocidade** roxos no meio dos trechos mais longos entre portões: passar por um dá um empurrão para a frente (e 100 pontos).
 - Para repetir ou compartilhar um mundo, use o link com a semente (`?seed=12345`); o menu tem um botão
   **Copiar link deste mundo**.
+
+### Jetpack, corrida e cutaway
+
+- **Jetpack na wingsuit** (`E` / `Shift`, combustível infinito): empurra para a frente; com o nariz levantado dá até para subir. Pode ser desligado em Ajustes.
+- **Corrida contra a IA**: um rival de roupa vermelha salta ao seu lado e voa a mesma linha, com jetpack. Quem cruzar o último portão primeiro vence; se você vencer e pousar bem, ganha 1000 pontos. O HUD mostra a diferença em metros, e uma etiqueta no céu mostra onde ele está. Também pode ser desligada em Ajustes.
+- **Cutaway** (`X` ou `Q` sob o paraquedas): você solta o paraquedas, que sai voando sozinho, e volta a voar de wingsuit. Depois é só abrir o reserva com `Espaço` (dá para repetir quantas vezes quiser). Cada cutaway vale 500 pontos se você pousar bem.
 
 ## Jogar
 
@@ -47,6 +54,7 @@ O `docs/index.html` já vem pronto e carrega o Three.js pela CDN do jsDelivr. N�
 | `S` / `↓` | Planar e fazer flare: troca velocidade por altura |
 | `A` / `D` | Inclinar e curvar |
 | `Espaço` | Saltar · abrir o paraquedas |
+| `E` / `Shift` | Jetpack (combustível infinito) |
 
 | Paraquedas | |
 |---|---|
@@ -54,6 +62,7 @@ O `docs/index.html` já vem pronto e carrega o Three.js pela CDN do jsDelivr. N�
 | `S` ou `Espaço` | Flare com os dois freios, a 3–5 m do chão |
 | `W` | Tirantes dianteiros: desce mais rápido |
 | `E` / `Shift` | Motor (paramotor): voa mais rápido e segura a altura, com 30 s de combustível |
+| `X` / `Q` | Cutaway: soltar o paraquedas e voltar a voar de wingsuit |
 
 | Geral | |
 |---|---|
@@ -63,13 +72,14 @@ O `docs/index.html` já vem pronto e carrega o Three.js pela CDN do jsDelivr. N�
 | `N` | Novo mundo (no menu e no resultado) |
 | `H` | Ajuda |
 
-**Gamepad:** analógico esquerdo pilota, A é a ação, B troca a câmera, os gatilhos são os freios e RB (ou X) liga o motor.
-**Celular:** arraste do lado esquerdo para pilotar, use o botão laranja para a ação e segure **MOTOR** sob o paraquedas.
+**Gamepad:** analógico esquerdo pilota, A é a ação, B troca a câmera, os gatilhos são os freios, RB (ou X) liga o jetpack e o motor e LB faz o cutaway.
+**Celular:** arraste do lado esquerdo para pilotar, use o botão laranja para a ação, segure **JATO** na wingsuit e **MOTOR** sob o paraquedas, e toque em **SOLTAR** para o cutaway.
 
 ### Como pontuar
 
 - Voe perto do relevo para somar pontos de proximidade. Ficar perto por alguns segundos sobe o multiplicador.
-- Passe pelos portões: 250 pontos cada, 500 no portão do lago e nos anéis de ouro, 750 na fenda entre as torres.
+- Passe pelos portões: 250 pontos cada, 500 no portão do lago e nos anéis de ouro, 750 na fenda entre as torres. Os anéis de velocidade valem 100.
+- Vença a corrida contra o rival (+1000) e faça cutaways (+500 cada), se pousar bem no fim.
 - Abra o paraquedas na faixa laranja do altímetro (a altura é medida acima do pouso). O bipe avisa a hora.
 - Pouse no alvo. Sob o paraquedas, o marcador laranja na tela aponta o alvo, e o anel amarelo no chão (ou na água) mostra onde você vai tocar se seguir reto. O anel fica verde quando está em cima do alvo. A fumaça laranja mostra a direção do vento.
 - Se não for alcançar o alvo, segure o motor: o marcador avisa quando for preciso, e a barra de baixo mostra o combustível.
@@ -83,6 +93,7 @@ O `docs/index.html` já vem pronto e carrega o Three.js pela CDN do jsDelivr. N�
 - **Física** (`src/50-flight.js`): passo fixo de 120 Hz, aerodinâmica da wingsuit com tabelas de sustentação e arrasto por ângulo de ataque e inclinação, sequência de abertura do paraquedas com choque de abertura, modelo de velame com freios, flare, vento e motor, e detecção de proximidade em 12 direções.
 - **Pássaros** (`src/30-scene.js`): gralhas e águias instanciadas, com o bater das asas no vertex shader.
 - **Câmeras** (`src/60-camera.js`), **áudio sintetizado com WebAudio** (`src/70-audio.js`), **teclado, toque e gamepad** (`src/80-input.js`).
+- **Rival** (`src/85-rival.js`): o piloto da IA roda a mesma física e o mesmo piloto automático do jogador, com o próprio estado trocado a cada passo; também cuida da classificação da corrida e do paraquedas solto no cutaway.
 - **Jogo** (`src/90-game.js`): pontuação, portões, replay gravado, HUD, minimapa, marcador do alvo, resolução adaptativa e ajustes salvos no `localStorage`.
 
 ## Estrutura

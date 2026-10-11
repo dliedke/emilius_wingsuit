@@ -2,7 +2,7 @@
 const R = {
   renderer: null, scene: null, camera: null, clock: null,
   world: null,   // everything that belongs to the current world (rebuilt for a new one)
-  terrain: [], trees: [], clouds: [], gates: [], water: [], cloudClusters: [],
+  terrain: [], trees: [], clouds: [], gates: [], boosts: [], water: [], cloudClusters: [],
   frustum: new THREE.Frustum(), projScreen: new THREE.Matrix4(),
 };
 const PAL_BASE = {
@@ -87,7 +87,7 @@ function disposeWorld() {
   for (const g of geos) g.dispose();
   for (const t of texs) if (!KEEP_TEX.has(t)) t.dispose();
   R.world = null;
-  R.terrain = []; R.trees = []; R.water = []; R.gates = []; R.cloudClusters = [];
+  R.terrain = []; R.trees = []; R.water = []; R.gates = []; R.boosts = []; R.cloudClusters = [];
   R.treeMat = null; R.sock = null; R.smoke = null; R.prop = null;
   BIRDS.flocks = []; BIRDS.mesh = null;
 }
@@ -866,6 +866,49 @@ function buildGates() {
   });
 }
 
+// ------------------------------------------------------------ speed rings
+// A short tunnel of violet rings halfway along the longer legs of the line. Flying
+// through one kicks you forward; they are not part of the gate sequence.
+const BOOST_COL = new THREE.Color(0xc65bff);
+const BOOST_R = 7.5, BOOST_DV = 14, BOOST_VMAX = 92, BOOST_POINTS = 100;
+function buildBoosts() {
+  const G = TC.GATES;
+  const pts = [[TC.EXIT.x, TC.EXIT.z, R.exitY], ...G.map((g) => [g[0], g[1], g[2]])];
+  const rnd = mulberry32(Math.imul(SEED, 40503) + 911);
+  const geo = new THREE.TorusGeometry(BOOST_R, 0.32, 8, 72);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 260) continue;
+    // off the exit the pilot falls steeply before gliding, so that leg's ring sits nearer the gate
+    const t = (i === 0 ? 0.72 : 0.42) + rnd() * 0.16;
+    const x = lerp(a[0], b[0], t), z = lerp(a[1], b[1], t);
+    let y = lerp(a[2], b[2], t);
+    // keep the ring (and a bit of room around it) clear of the ground; skip it if that lifts it far off the line
+    let floor = surfaceHeight(x, z);
+    for (let k = 0; k < 8; k++) { const q = k / 8 * Math.PI * 2; floor = Math.max(floor, surfaceHeight(x + Math.cos(q) * BOOST_R * 1.6, z + Math.sin(q) * BOOST_R * 1.6)); }
+    const need = floor + BOOST_R + 8;
+    if (need > y + 18) continue;
+    y = Math.max(y, need);
+    const dir = new THREE.Vector3(b[0] - a[0], (b[2] - a[2]) * 0.3, b[1] - a[1]).normalize();
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { ...pickU(), uColA: { value: BOOST_COL.clone() }, uColB: { value: GATE_WHITE.clone() }, uGlow: { value: 0.6 }, uFade: { value: 1 } },
+      vertexShader: GATE_VS, fragmentShader: GATE_FS, transparent: true, depthWrite: false,
+    });
+    const group = new THREE.Group();
+    for (let k = -1; k <= 1; k++) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(0, 0, k * 4.5);
+      m.scale.setScalar(1 - k * 0.08);
+      m.renderOrder = 6;
+      group.add(m);
+    }
+    group.position.set(x, y, z);
+    group.lookAt(x + dir.x, y + dir.y, z + dir.z);
+    R.world.add(group);
+    R.boosts.push({ mesh: group, mat, x, y, z, r: BOOST_R, n: dir, state: 0, t: 0, rival: false });
+  }
+}
+
 // ------------------------------------------------------------------ birds
 // Alpine choughs in flocks in front of the exit and along the line (they scatter,
 // calling, when you pass close) and a few raptors circling in thermals over the
@@ -999,7 +1042,7 @@ function updateBirds(dt, player) {
 
 // ------------------------------------------------------------ smoke trail
 const TRAIL_N = 200;
-function buildTrail() {
+function buildTrail(color = 0xffc9a8) {
   const pos = new Float32Array(TRAIL_N * 2 * 3), age = new Float32Array(TRAIL_N * 2), uv = new Float32Array(TRAIL_N * 2 * 2);
   const idx = [];
   for (let i = 0; i < TRAIL_N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
@@ -1010,17 +1053,16 @@ function buildTrail() {
   g.setIndex(idx);
   g.setDrawRange(0, 0);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { ...pickU(), uNoise: U.uNoise, uColor: { value: new THREE.Color(0xffc9a8) } },
+    uniforms: { ...pickU(), uNoise: U.uNoise, uColor: { value: new THREE.Color(color) } },
     vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(g, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 8;
   R.scene.add(mesh);
-  R.trail = { mesh, g, pts: [], t: 0 };
+  return { mesh, g, pts: [], t: 0 };
 }
-function updateTrail(dt, emitPos, emitting, cam, simTime) {
-  const T = R.trail;
+function updateTrail(T, dt, emitPos, emitting, cam, simTime) {
   const LIFE = 9;
   if (emitting) {
     T.t += dt;

@@ -15,26 +15,29 @@ const POSE_HANG = { // under canopy, hands up on the toggles
   hip: V3(0.11, 0, 0.13), kn: V3(0.13, -0.16, 0.5), ft: V3(0.14, -0.1, 0.9),
 };
 
-function suitTexture() {
+// suit and canopy colours: the player's, and the AI rival's
+const LOOK_PLAYER = { suit: 0xe9eef2, wing: '#e8edf0', band: '#7fb3e4', accent: '#ff6b1a', rib: '#c9d3da', canopy: ['#f2efe8', '#ff6b1a', '#1d1f24'] };
+const LOOK_RIVAL = { suit: 0x3a3f47, wing: '#2f343b', band: '#e8343c', accent: '#ffd24a', rib: '#454b53', canopy: ['#ffd24a', '#d8262f', '#1d1f24'] };
+function suitTexture(L) {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
   const g = cv.getContext('2d');
-  g.fillStyle = '#e8edf0'; g.fillRect(0, 0, 256, 128);
-  g.fillStyle = '#7fb3e4'; g.fillRect(0, 0, 256, 26);            // leading-edge band
-  g.fillStyle = '#ff6b1a'; g.fillRect(0, 26, 256, 5);
-  g.fillStyle = '#c9d3da';
+  g.fillStyle = L.wing; g.fillRect(0, 0, 256, 128);
+  g.fillStyle = L.band; g.fillRect(0, 0, 256, 26);            // leading-edge band
+  g.fillStyle = L.accent; g.fillRect(0, 26, 256, 5);
+  g.fillStyle = L.rib;
   for (let i = 0; i < 8; i++) g.fillRect(i * 32 + 14, 30, 2, 98); // inflation ribs
   g.fillStyle = '#2a2f36'; g.fillRect(0, 120, 256, 8);            // trailing edge binding
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return t;
 }
-function canopyTexture() {
+function canopyTexture(cols) {
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
   const g = cv.getContext('2d');
   const cells = 9;
   for (let c = 0; c < cells; c++) {
     const x0 = (c / cells) * 512, w = 512 / cells;
     const center = Math.abs(c - 4);
-    g.fillStyle = center === 0 ? '#f2efe8' : center % 2 === 1 ? '#ff6b1a' : '#1d1f24';
+    g.fillStyle = center === 0 ? cols[0] : center % 2 === 1 ? cols[1] : cols[2];
     g.fillRect(x0, 0, w + 1, 128);
   }
   g.fillStyle = 'rgba(0,0,0,0.25)';
@@ -44,12 +47,12 @@ function canopyTexture() {
 }
 
 class Jumper {
-  constructor() {
+  constructor(look = LOOK_PLAYER) {
     this.root = new THREE.Group();
-    const suit = stdMat({ color: 0xe9eef2, roughness: 0.62 });
+    const suit = stdMat({ color: look.suit, roughness: 0.62 });
     const dark = stdMat({ color: 0x17191c, roughness: 0.7 });
     const glove = stdMat({ color: 0x23272d, roughness: 0.8 });
-    const wingMat = stdMat({ map: suitTexture(), roughness: 0.58, side: THREE.DoubleSide });
+    const wingMat = stdMat({ map: suitTexture(look), roughness: 0.58, side: THREE.DoubleSide });
     this.mats = { suit, dark, wingMat };
     const add = (m) => { m.castShadow = false; this.root.add(m); return m; };
     // torso
@@ -113,10 +116,31 @@ class Jumper {
     this.motor.position.set(0, 0.36, -0.3);
     this.motor.visible = false;
     this.root.add(this.motor);
+    // wingsuit jetpack: two ducted thrusters on the container, flames toward the feet (+Z)
+    this.jet = new THREE.Group();
+    const jetMat = stdMat({ color: 0x8d949c, roughness: 0.3, metalness: 0.85 });
+    const flameGeo = new THREE.ConeGeometry(0.075, 1, 10, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0xbfe4ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    this.flames = [];
+    for (const sx of [-1, 1]) {
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.4, 12).rotateX(Math.PI / 2), jetMat);
+      pod.position.set(sx * 0.13, 0.2, -0.2);
+      this.jet.add(pod);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.012, 6, 16), stdMat({ color: 0xff6b1a, roughness: 0.5 }));
+      ring.position.set(sx * 0.13, 0.2, 0);
+      this.jet.add(ring);
+      const flame = new THREE.Mesh(flameGeo, flameMat), core = new THREE.Mesh(flameGeo, coreMat);
+      flame.position.set(sx * 0.13, 0.2, 0.01); core.position.copy(flame.position);
+      flame.frustumCulled = core.frustumCulled = false;
+      this.jet.add(flame, core);
+      this.flames.push({ flame, core });
+    }
+    this.root.add(this.jet);
     this.J = {};
     for (const k of Object.keys(POSE_FLY)) this.J[k] = new THREE.Vector3();
     this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._q = new THREE.Quaternion();
-    this.pose = { fly: 0, hang: 0, roll: 0, pitch: 0, speed: 0, brakeL: 0, brakeR: 0, t: 0, thrust: 0 };
+    this.pose = { fly: 0, hang: 0, roll: 0, pitch: 0, speed: 0, brakeL: 0, brakeR: 0, t: 0, thrust: 0, jetOn: false, jet: 0 };
     this.propA = 0;
   }
   setLimb(m, a, b) {
@@ -180,6 +204,17 @@ class Jumper {
       this.propDisc.material.opacity = 0.32 * smoothstep(0.15, 0.6, P.thrust);
       this.prop.visible = P.thrust < 0.45;
     }
+    this.jet.visible = P.jetOn && P.hang < 0.5;
+    if (this.jet.visible) {
+      for (let i = 0; i < 2; i++) {
+        const F = this.flames[i], on = P.jet > 0.03;
+        F.flame.visible = F.core.visible = on;
+        if (!on) continue;
+        const fl = 1 + 0.18 * Math.sin(P.t * 61 + i * 2.1) + 0.1 * Math.sin(P.t * 37 + i);
+        F.flame.scale.set(1 + 0.3 * P.jet, 1 + 0.3 * P.jet, (0.25 + 0.95 * P.jet) * fl);
+        F.core.scale.set(0.45, 0.45, (0.12 + 0.45 * P.jet) * fl);
+      }
+    }
     // arm wings
     const spread = P.fly;
     for (const w of this.wings) {
@@ -229,12 +264,12 @@ class Jumper {
 
 // ---------------------------------------------------------------- canopy
 class Canopy {
-  constructor() {
+  constructor(cols = LOOK_PLAYER.canopy) {
     this.group = new THREE.Group();
     this.span = 7.3; this.chord = 2.85;
     const NU = 36, NV = 10;
     this.NU = NU; this.NV = NV;
-    const tex = canopyTexture();
+    const tex = canopyTexture(cols);
     this.topMat = stdMat({ map: tex, roughness: 0.75, side: THREE.DoubleSide });
     this.botMat = stdMat({ map: tex, color: 0xb9b3aa, roughness: 0.85, side: THREE.DoubleSide });
     const mk = (mat) => {

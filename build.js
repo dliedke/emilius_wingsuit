@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const dir = path.join(__dirname, 'src');
-const order = ['00-core.js', '05-i18n.js', 'terrain-core.js', '10-worldgen.js', '20-shaders.js', '30-scene.js', '40-player.js', '50-flight.js', '60-camera.js', '70-audio.js', '80-input.js', '90-game.js'];
+const order = ['00-core.js', '05-i18n.js', 'terrain-core.js', '10-worldgen.js', '20-shaders.js', '30-scene.js', '40-player.js', '50-flight.js', '60-camera.js', '70-audio.js', '80-input.js', '85-rival.js', '90-game.js'];
 const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 
 let js = '';

@@ -107,6 +107,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 .callout.lake { color: var(--lake); }
 .callout.red { color: var(--danger); }
 .callout.gold { color: #ffc21f; }
+.callout.violet { color: #d58bff; }
 @keyframes pop { 0% { opacity: 0; transform: translateY(8px) scale(0.92); } 10% { opacity: 1; transform: translateY(0) scale(1.04); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
 #prompt { position: absolute; left: 50%; bottom: calc(36% + var(--safe-b)); transform: translateX(-50%); font-family: var(--f-display); font-weight: 800; font-size: clamp(22px, 3vw, 30px); letter-spacing: 0.06em; text-transform: uppercase; text-align: center; text-shadow: 0 2px 14px rgba(0,0,0,0.5); }
 #prompt small { display: block; margin-top: 8px; font-family: var(--f-ui); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
@@ -115,6 +116,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 #prompt.blink { animation: blink 0.8s steps(2) infinite; color: var(--signal); }
 #prompt.top { bottom: auto; top: calc(27% + var(--safe-t)); }
 @keyframes blink { 50% { opacity: 0.25; } }
+#race.ahead { color: var(--good); }
+#race.behind { color: var(--danger); }
+#rivaltag { position: absolute; left: 0; top: 0; opacity: 0; transition: opacity .3s; will-change: transform; }
+#rivaltag.on { opacity: 1; }
+#rivaltag > div { position: absolute; left: 0; bottom: 4px; transform: translateX(-50%); white-space: nowrap; font-family: var(--f-data); font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(7,16,20,0.6); color: var(--snow); border: 1px solid rgba(255,74,74,0.7); }
+#rivaltag b { color: #ff6b6b; letter-spacing: 0.1em; }
 #minimap { position: absolute; left: max(14px, var(--safe-l)); bottom: calc(14px + var(--safe-b)); width: clamp(92px, 10.5vw, 140px); aspect-ratio: 300 / 480; }
 #minimap canvas { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 6px; }
 #lzmark { position: absolute; left: 0; top: 0; width: 0; height: 0; opacity: 0; transition: opacity .45s; will-change: transform; }
@@ -191,6 +198,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
 #btncam { right: max(22px, var(--safe-r)); bottom: calc(162px + var(--safe-b)); }
 #btnthr { position: absolute; right: calc(max(22px, var(--safe-r)) + 122px); bottom: calc(52px + var(--safe-b)); width: 84px; height: 84px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); background: rgba(8,16,20,0.55); color: var(--snow); font-family: var(--f-display); font-weight: 900; font-size: 17px; letter-spacing: 0.06em; pointer-events: auto; touch-action: none; }
 #btnthr.on { background: var(--good); color: #0d1a08; border-color: var(--good); }
+#btncut { right: calc(max(22px, var(--safe-r)) + 122px); bottom: calc(150px + var(--safe-b)); background: rgba(255,74,54,0.4); border-color: var(--danger); letter-spacing: 0.06em; }
 #btnpause { right: max(22px, var(--safe-r)); top: calc(220px + var(--safe-t)); }
 
 @media (max-height: 640px) { #minimap { display: none; } }
@@ -281,6 +289,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     <div id="mult">×1</div>
     <div class="line2"><span data-i18n="hud.gates">Portões</span><b id="gates" class="num">0/9</b></div>
     <div class="line2"><span data-i18n="hud.time">Tempo</span><b id="time" class="num">0:00</b></div>
+    <div class="line2" id="raceline" hidden><span data-i18n="hud.rival">Rival</span><b id="race" class="num">–</b></div>
   </div>
   <div id="hud-bottom" class="hud-card">
     <div class="speedrow">
@@ -296,6 +305,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     </div>
   </div>
   <div id="lzmark" aria-hidden="true"><div class="lzm-ring"></div><div class="lzm-arrow"></div><div class="lzm-lbl"><div class="lzm-top"><b data-i18n="hud.target">ALVO</b> <span id="lzm-d" class="num">–</span></div><div id="lzm-h" class="num"></div><div id="lzm-hint"></div></div></div>
+  <div id="rivaltag" aria-hidden="true"><div><b data-i18n="hud.rivaltag">RIVAL</b> <span id="rivald" class="num"></span></div></div>
   <div id="hud-msg"></div>
   <div id="prompt"></div>
   <div id="minimap"><canvas id="mm0" width="300" height="480"></canvas><canvas id="mm1" width="300" height="480"></canvas></div>
@@ -307,6 +317,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
   <div id="joyzone"><div id="joybase"><div id="joyknob"></div></div></div>
   <button id="btnact">SALTAR</button>
   <button id="btnthr" data-i18n="btn.motor" hidden>MOTOR</button>
+  <button id="btncut" class="tbtn" data-i18n="btn.cutaway" hidden>SOLTAR</button>
   <button id="btncam" class="tbtn" data-i18n="touch.camera">Câmera</button>
   <button id="btnpause" class="tbtn" data-i18n="touch.pause">Pausa</button>
 </div>
@@ -346,11 +357,13 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
       <span><kbd>S</kbd> <kbd>↓</kbd></span><span data-i18n="help.glideflare">Planar e fazer flare: troca velocidade por altura</span>
       <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.turn">Inclinar e curvar</span>
       <span><kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.jumpopen">Saltar · abrir o paraquedas</span>
+      <span><kbd>E</kbd> <kbd>Shift</kbd></span><span data-i18n="help.jet">Jetpack: empurra para a frente, combustível infinito</span>
       <h3 data-i18n="help.section.parachute">Paraquedas</h3>
       <span><kbd>A</kbd> <kbd>D</kbd></span><span data-i18n="help.brakes">Freio esquerdo / direito para curvar</span>
       <span><kbd>S</kbd> <span data-i18n="help.or">ou</span> <kbd data-i18n="key.space">Espaço</kbd></span><span data-i18n="help.flare">Flare com os dois freios, a 3–5 m do chão</span>
       <span><kbd>W</kbd></span><span data-i18n="help.frontrisers">Tirantes dianteiros: desce mais rápido</span>
       <span><kbd>E</kbd> <kbd>Shift</kbd></span><span data-i18n="help.motor">Motor: voa mais rápido e segura a altura (combustível limitado)</span>
+      <span><kbd>X</kbd> <kbd>Q</kbd></span><span data-i18n="help.cutaway">Soltar o paraquedas e voltar a voar de wingsuit (abra o reserva com Espaço)</span>
       <h3 data-i18n="help.section.general">Geral</h3>
       <span><kbd>C</kbd></span><span data-i18n="help.camera">Trocar câmera</span>
       <span><kbd>F</kbd> <kbd>M</kbd></span><span data-i18n="help.smokesound">Fumaça · som</span>
@@ -359,6 +372,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     </div>
     <p class="note" data-i18n="help.note1">Com a assistência de voo ligada (Ajustes), o piloto levanta o nariz sozinho quando vai bater, e toques rasantes viram uma raspada que custa pontos em vez de acabar o voo. Nos primeiros segundos após o salto o corpo se posiciona sozinho: é só esperar a wingsuit inflar.</p>
     <p class="note" data-i18n="help.note2">Voe perto do relevo para somar pontos de proximidade; ficar perto por alguns segundos sobe o multiplicador. Passe pelos 10 portões (a fenda entre as duas torres vale mais) e abra o paraquedas acima do vale. Pouse no alvo laranja (a fumaça laranja mostra onde ele está e para onde vai o vento): o bipe do altímetro avisa a hora de abrir. Sob o paraquedas, o marcador na tela aponta o alvo e o anel amarelo no chão mostra onde você vai pousar se seguir reto — ele fica verde quando está em cima do alvo. Gamepad: analógico esquerdo, A para ação, B para câmera, gatilhos como freios. No celular: arraste à esquerda para pilotar, botão laranja para a ação.</p>
+    <p class="note" data-i18n="help.note3">Corrida: um rival de roupa vermelha salta com você e voa a mesma linha; quem cruzar o último portão primeiro vence (+1000 se você pousar bem). Os anéis roxos entre os portões dão um empurrão de velocidade.</p>
     <div class="row"><button class="btn primary" id="bhelpclose" data-i18n="action.close">Fechar</button></div>
   </div>
 </div>
@@ -369,6 +383,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--lake); outline-
     <div class="opts">
       <div class="opt"><span data-i18n="set.language">Idioma</span><button class="btn" id="olang">Português</button></div>
       <div class="opt"><span data-i18n="set.assist">Assistência de voo (puxa o nariz antes de bater e perdoa toques rasantes)</span><button class="btn" id="oa">Ligada</button></div>
+      <div class="opt"><span data-i18n="set.jetpack">Jetpack na wingsuit (E ou Shift, combustível infinito)</span><button class="btn" id="oj">Ligado</button></div>
+      <div class="opt"><span data-i18n="set.race">Corrida contra a IA (um rival voa a mesma linha)</span><button class="btn" id="orace">Ligado</button></div>
       <div class="opt"><span data-i18n="set.quality">Qualidade gráfica</span><button class="btn" id="oq">Média</button></div>
       <div class="opt"><span data-i18n="set.sound">Som</span><button class="btn" id="os">Ligado</button></div>
       <div class="opt"><span data-i18n="set.invert">Inverter arfagem (W puxa, S mergulha)</span><button class="btn" id="oi">Não</button></div>

@@ -6,18 +6,21 @@ const GAME = {
   score: 0, proxPts: 0, gatePts: 0, mult: 1, streakT: 0, farT: 0, tier: 0, tierT: [0, 0, 0, 0],
   gatesPassed: 0, flightT: 0, maxSpeed: 0, dist: 0, lastPos: new THREE.Vector3(),
   best: store('best') || 0,
-  rec: [], recT: 0, replay: null,
+  rec: [], recT: 0, replay: null, raceT: -1, boostPts: 0, boosts: 0,
   attractT: 0, endT: -1, warn: 0, beepT: 0,
   hudT: 0, lastFrame: 0,
 };
 let JUMPER = null, CANOPY = null;
-const VIS = {
-  pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fly: 0, hang: 0, roll: 0, pitch: 0, bl: 0, br: 0,
-  canopyOn: false, infl: 0, canopyPos: new THREE.Vector3(), canopyQuat: new THREE.Quaternion(),
-  pcOn: false, pcPos: new THREE.Vector3(), bridleFrom: new THREE.Vector3(),
-  phase: 'ready', phaseT: 0, heading: 0, vel: new THREE.Vector3(), prox: 999, up: new THREE.Vector3(0, 1, 0),
-  headPos: new THREE.Vector3(), canopyMid: new THREE.Vector3(), feet: new THREE.Vector3(), thrust: 0,
-};
+function makeVis() {
+  return {
+    pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fly: 0, hang: 0, roll: 0, pitch: 0, bl: 0, br: 0,
+    canopyOn: false, infl: 0, canopyPos: new THREE.Vector3(), canopyQuat: new THREE.Quaternion(),
+    pcOn: false, pcPos: new THREE.Vector3(), bridleFrom: new THREE.Vector3(),
+    phase: 'ready', phaseT: 0, heading: 0, vel: new THREE.Vector3(), prox: 999, up: new THREE.Vector3(0, 1, 0),
+    headPos: new THREE.Vector3(), canopyMid: new THREE.Vector3(), feet: new THREE.Vector3(), thrust: 0, jet: 0,
+  };
+}
+let VIS = makeVis();
 const _q0 = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _g1 = new THREE.Vector3(), _g2 = new THREE.Vector3(), _g3 = new THREE.Vector3(), _g4 = new THREE.Vector3(), _gm = new THREE.Matrix4();
 
 // ------------------------------------------------------------ frames
@@ -46,14 +49,15 @@ function canopyFrame(hv, heading, noseUp, out) {
 }
 
 // ------------------------------------------------------ visual state
-function computeVis(dt) {
+function computeVis(dt, inp = INPUT) {
   const s = SIM;
   VIS.phase = s.phase; VIS.phaseT = s.phaseT; VIS.heading = s.heading; VIS.vel.copy(s.vel); VIS.prox = s.prox;
   VIS.pos.copy(s.pos);
-  VIS.roll = damp(VIS.roll, s.phase === 'fly' ? INPUT.roll : 0, 8, dt);
-  VIS.pitch = damp(VIS.pitch, s.phase === 'fly' ? INPUT.pitch : 0, 8, dt);
+  VIS.roll = damp(VIS.roll, s.phase === 'fly' ? inp.roll : 0, 8, dt);
+  VIS.pitch = damp(VIS.pitch, s.phase === 'fly' ? inp.pitch : 0, 8, dt);
   VIS.bl = s.toggleL; VIS.br = s.toggleR;
   VIS.thrust = s.phase === 'canopy' ? s.thrust : 0;
+  VIS.jet = s.phase === 'fly' ? s.thrust : 0;
   VIS.canopyOn = false; VIS.pcOn = false;
   switch (s.phase) {
     case 'ready':
@@ -158,17 +162,19 @@ function computeVis(dt) {
   }
 }
 
-function applyVis(dt) {
+// own: the player (helmet camera hides the head, casts the analytic shadows); false for the rival
+function applyVis(dt, own = true) {
   const J = JUMPER;
   J.root.position.copy(VIS.pos);
   J.root.quaternion.copy(VIS.quat);
   const P = J.pose;
   P.fly = VIS.fly; P.hang = VIS.hang; P.roll = VIS.roll; P.pitch = VIS.pitch; P.speed = VIS.vel.length(); P.brakeL = VIS.bl; P.brakeR = VIS.br; P.thrust = VIS.thrust;
+  P.jetOn = SETTINGS.jetpack; P.jet = VIS.jet || 0;
   J.update(dt);
   J.root.updateMatrixWorld(true);
   VIS.headPos.copy(J.head.position); J.root.localToWorld(VIS.headPos);
   VIS.feet.set(0, 0.02, 0.95); J.root.localToWorld(VIS.feet);
-  J.head.visible = !(camModeNow() === 1);
+  J.head.visible = !own || camModeNow() !== 1;
   const C = CANOPY;
   C.group.visible = VIS.canopyOn; C.lines.visible = VIS.canopyOn;
   if (VIS.canopyOn) {
@@ -195,6 +201,7 @@ function applyVis(dt) {
     b[0] = VIS.bridleFrom.x; b[1] = VIS.bridleFrom.y; b[2] = VIS.bridleFrom.z; b[3] = VIS.pcPos.x; b[4] = VIS.pcPos.y; b[5] = VIS.pcPos.z;
     C.bridle.geometry.attributes.position.needsUpdate = true;
   }
+  if (!own) return;
   // analytic shadows on the terrain
   const ph = VIS.phase;
   const c0 = CASTERS.c0.value, c1 = CASTERS.c1.value;
@@ -230,26 +237,33 @@ function camState() {
 }
 
 // ------------------------------------------------------------ run control
+// a pilot standing on the exit, ready to jump
+function resetSim(s, x, y, z, heading) {
+  Object.assign(s, {
+    phase: 'ready', time: 0, phaseT: 0, heading, alpha: WS.aTrim, bank: 0, inflate: 0, deployT: 0, openShock: 0,
+    u: 0, w: 0, yawRate: 0, flare: 0, toggleL: 0, toggleR: 0, swingRoll: 0, swingPitch: 0, outcome: null, crashCause: null, landing: null,
+    agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0, thrust: 0, fuel: 1, cutaways: 0,
+  });
+  s.pos.set(x, y, z);
+  s.prev.copy(s.pos);
+  s.vel.set(0, 0, 0);
+  s.liftDir.set(0, 1, 0);
+}
 function resetRun() {
   const E = TC.EXIT;
-  Object.assign(SIM, {
-    phase: 'ready', time: 0, phaseT: 0, heading: E.heading, alpha: WS.aTrim, bank: 0, inflate: 0, deployT: 0, openShock: 0,
-    u: 0, w: 0, yawRate: 0, flare: 0, toggleL: 0, toggleR: 0, swingRoll: 0, swingPitch: 0, outcome: null, crashCause: null, landing: null,
-    agl: 0, prox: 999, gLoad: 1, warn: 0, airT: 0, scrapeCool: 0, thrust: 0, fuel: 1,
-  });
-  SIM.pos.set(E.x, R.exitY + 0.93, E.z);
-  SIM.prev.copy(SIM.pos);
-  SIM.vel.set(0, 0, 0);
-  SIM.liftDir.set(0, 1, 0);
+  resetSim(SIM, E.x, R.exitY + 0.93, E.z, E.heading);
   EVENTS.length = 0;
-  INPUT.pitch = INPUT.roll = INPUT.brakeL = INPUT.brakeR = INPUT.thrust = 0; INPUT.deploy = false;
+  INPUT.pitch = INPUT.roll = INPUT.brakeL = INPUT.brakeR = INPUT.thrust = 0; INPUT.deploy = INPUT.cutaway = false;
   IN.pitch = IN.roll = IN.bl = IN.br = 0; IN.touchThrust = false;
-  Object.assign(GAME, { scrapes: 0, score: 0, proxPts: 0, gatePts: 0, mult: 1, streakT: 0, farT: 0, tier: 0, gatesPassed: 0, flightT: 0, maxSpeed: 0, dist: 0, endT: -1, warn: 0, beepT: 0, rec: [], recT: 0 });
+  Object.assign(GAME, { scrapes: 0, score: 0, proxPts: 0, gatePts: 0, boostPts: 0, boosts: 0, mult: 1, streakT: 0, farT: 0, tier: 0, gatesPassed: 0, flightT: 0, maxSpeed: 0, dist: 0, endT: -1, warn: 0, beepT: 0, rec: [], recT: 0, raceT: -1 });
   GAME.tierT = [0, 0, 0, 0];
   GAME.lastPos.copy(SIM.pos);
   for (const g of R.gates) { g.state = 0; g.t = 0; g.mesh.visible = true; g.mat.uniforms.uFade.value = 1; g.mesh.scale.setScalar(1); }
+  for (const b of R.boosts) { b.state = 0; b.t = 0; b.rival = false; }
   AUTO.gate = 0; AUTO.cT = 0; AUTO.hold = null;
   R.trail.pts.length = 0;
+  FREE.on = false; FREE.canopy.visible(false);
+  resetRival();
   VIS.roll = VIS.pitch = 0;
   CAM.shot = null; CAM.trauma = 0;
   CAM.dir.set(0, 0, -1);
@@ -261,6 +275,7 @@ function doJump() {
   const f = headingVec(SIM.heading, new THREE.Vector3());
   SIM.vel.copy(f).multiplyScalar(6.2); SIM.vel.y = 2.0;
   SIM.inflate = 0;
+  if (RIVAL.on) { RIVAL.jumpT = 0.25; RIVAL.t0 = SIM.time; }
   SFX.jump();
   if (GAME.state === 'play') callout(i18n('callout.exit'), 'orange', true);
 }
@@ -282,6 +297,19 @@ function callout(text, cls = '', small = false) {
   setTimeout(() => el.remove(), 1700);
 }
 function nextGateIndex() { for (let i = 0; i < R.gates.length; i++) if (R.gates[i].state === 0) return i; return -1; }
+// where the path segment a→b crosses a ring's plane going forward: distance from its centre, or -1
+function ringCross(g, a, b) {
+  const da = (a.x - g.x) * g.n.x + (a.y - g.y) * g.n.y + (a.z - g.z) * g.n.z;
+  const db = (b.x - g.x) * g.n.x + (b.y - g.y) * g.n.y + (b.z - g.z) * g.n.z;
+  if (!(da < 0 && db >= 0)) return -1;
+  const t = da / (da - db);
+  return Math.hypot(a.x + (b.x - a.x) * t - g.x, a.y + (b.y - a.y) * t - g.y, a.z + (b.z - a.z) * t - g.z);
+}
+// speed ring kick: forward along the flight path, up to a cap
+function applyBoost(s) {
+  const V = s.vel.length(), nv = Math.min(BOOST_VMAX, V + BOOST_DV);
+  if (nv > V && V > 1) s.vel.multiplyScalar(nv / V);
+}
 function gameplay(dt) {
   const s = SIM;
   const live = GAME.state === 'play';
@@ -292,12 +320,8 @@ function gameplay(dt) {
   for (let i = 0; i < R.gates.length; i++) {
     const g = R.gates[i];
     if (g.state !== 0) continue;
-    const da = (a.x - g.x) * g.n.x + (a.y - g.y) * g.n.y + (a.z - g.z) * g.n.z;
-    const db = (b.x - g.x) * g.n.x + (b.y - g.y) * g.n.y + (b.z - g.z) * g.n.z;
-    if (da < 0 && db >= 0) {
-      const t = da / (da - db);
-      const hx = a.x + (b.x - a.x) * t - g.x, hy = a.y + (b.y - a.y) * t - g.y, hz = a.z + (b.z - a.z) * t - g.z;
-      const r = Math.sqrt(hx * hx + hy * hy + hz * hz);
+    const r = ringCross(g, a, b);
+    if (r >= 0) {
       if (r <= g.r + 1.2) {
         g.state = 1; g.t = 0;
         for (let j = 0; j < i; j++) if (R.gates[j].state === 0) { R.gates[j].state = 2; R.gates[j].t = 0; }
@@ -311,6 +335,25 @@ function gameplay(dt) {
         if (live) callout(i18n('callout.gatemissed'), '', true);
       }
     }
+  }
+  if (flying) for (const bo of R.boosts) {
+    if (bo.state !== 0) continue;
+    const r = ringCross(bo, a, b);
+    if (r >= 0 && r <= bo.r + 1.5) {
+      bo.state = 1; bo.t = 0;
+      applyBoost(s);
+      const pts = BOOST_POINTS * GAME.mult;
+      GAME.boostPts += pts; GAME.score += pts; GAME.boosts++;
+      SFX.boost(); addTrauma(0.25);
+      if (live) callout(i18n('callout.boost', { pts }), 'violet', true);
+    }
+  }
+  // race: the run ends at the last gate (passed or just missed)
+  const last = R.gates[R.gates.length - 1];
+  if (RIVAL.on && GAME.raceT < 0 && last && last.state !== 0) {
+    GAME.raceT = SIM.time - RIVAL.t0;
+    const won = RIVAL.finishT < 0 || GAME.raceT < RIVAL.finishT;
+    if (live) callout(i18n(won ? 'callout.racewin' : 'callout.racelose'), won ? 'gold' : 'orange');
   }
   if (flying || s.phase === 'deploy' || s.phase === 'canopy') {
     GAME.maxSpeed = Math.max(GAME.maxSpeed, spd);
@@ -354,7 +397,13 @@ function handleEvents() {
   const live = GAME.state === 'play';
   while (EVENTS.length) {
     const e = EVENTS.shift();
-    if (e.type === 'deploy') { SFX.deploy(); if (live) callout(i18n('callout.opening'), '', true); }
+    if (e.type === 'deploy') { SFX.deploy(); if (live) callout(i18n(SIM.cutaways ? 'callout.reserve' : 'callout.opening'), '', true); }
+    else if (e.type === 'cutaway') {
+      SFX.cutaway(); addTrauma(0.4);
+      spawnFreeCanopy();
+      GAME.warn = 0;
+      if (live) callout(i18n('callout.cutaway'), 'red');
+    }
     else if (e.type === 'scrape') {
       GAME.scrapes++;
       const pen = Math.min(GAME.score, 250);
@@ -383,7 +432,7 @@ function handleEvents() {
 
 // ------------------------------------------------------------ results
 function computeScore() {
-  const b = { prox: Math.round(GAME.proxPts), gates: GAME.gatePts, speed: Math.round(GAME.maxSpeed * 3.6) * 2, landing: 0, accuracy: 0 };
+  const b = { prox: Math.round(GAME.proxPts), gates: GAME.gatePts, boosts: GAME.boostPts, speed: Math.round(GAME.maxSpeed * 3.6) * 2, landing: 0, accuracy: 0, race: 0, cutaway: 0 };
   const s = SIM;
   const ok = s.outcome === 'landed';
   if (s.landing) {
@@ -392,11 +441,14 @@ function computeScore() {
     if (L.kind !== 'water' && L.kind !== 'tree') b.accuracy = L.dist < 3 ? 2000 : Math.max(0, Math.round(1500 - L.dist * 18));
     else if (L.splash) b.accuracy = Math.max(0, Math.round((1500 - L.dist * 18) / 2));
   }
-  const total = s.outcome === 'crash' ? b.prox + b.gates : b.prox + b.gates + b.speed + b.landing + b.accuracy;
-  return { b, total, ok };
+  const race = raceResult();
+  if (ok && race.won) b.race = RACE_BONUS;
+  if (ok) b.cutaway = s.cutaways * CUTAWAY_BONUS;
+  const total = s.outcome === 'crash' ? b.prox + b.gates + b.boosts : b.prox + b.gates + b.boosts + b.speed + b.landing + b.accuracy + b.race + b.cutaway;
+  return { b, total, ok, race };
 }
 function renderResults() {
-  const { b, total } = computeScore();
+  const { b, total, race } = computeScore();
   const s = SIM;
   const T = $('rtitle'), why = $('rwhy');
   T.className = '';
@@ -419,8 +471,15 @@ function renderResults() {
     [i18n('hud.proximity'), fmt(b.prox)],
     [i18n('result.row.gates', { passed: GAME.gatesPassed, total: R.gates.length }), fmt(b.gates)],
   ];
+  if (R.boosts.length) rows.push([i18n('result.row.boosts', { n: GAME.boosts, total: R.boosts.length }), fmt(b.boosts)]);
   if (GAME.scrapes) rows.push([i18n('result.row.scrapes'), String(GAME.scrapes)]);
   if (s.outcome !== 'crash') rows.push([i18n('result.row.speedbonus'), fmt(b.speed)], [i18n('result.row.landing'), fmt(b.landing)], [i18n('result.row.accuracy'), fmt(b.accuracy)]);
+  if (s.cutaways) rows.push([i18n('result.row.cutaways', { n: s.cutaways }), fmt(b.cutaway)]);
+  if (race.on) {
+    const key = 'result.row.race.' + (race.won ? 'win' : 'lose') + (race.margin >= 0 ? '' : 'nt');
+    const sec = race.margin >= 0 ? (LANG === 'pt' ? race.margin.toFixed(1).replace('.', ',') : race.margin.toFixed(1)) : '';
+    rows.push([i18n(key, { s: sec }), fmt(b.race)]);
+  }
   rows.push([i18n('result.row.total'), fmt(total)]);
   $('rtable').innerHTML = rows.map(([k, v], i) => i === rows.length - 1 ? `<span class="tot">${k}</span><span class="tot">${v}</span>` : `<span>${k}</span><span>${v}</span>`).join('');
 }
@@ -447,7 +506,7 @@ function recordFrame(dt) {
     SIM.time, v.pos.x, v.pos.y, v.pos.z, v.quat.x, v.quat.y, v.quat.z, v.quat.w, PHASES.indexOf(v.phase), v.fly, v.hang, v.roll, v.pitch, v.bl, v.br,
     v.canopyOn ? 1 : 0, v.infl, v.canopyPos.x, v.canopyPos.y, v.canopyPos.z, v.canopyQuat.x, v.canopyQuat.y, v.canopyQuat.z, v.canopyQuat.w,
     v.pcOn ? 1 : 0, v.pcPos.x, v.pcPos.y, v.pcPos.z, v.vel.x, v.vel.y, v.vel.z, v.heading, v.prox, v.phaseT, v.up.x, v.up.y, v.up.z,
-    v.bridleFrom.x, v.bridleFrom.y, v.bridleFrom.z, v.thrust,
+    v.bridleFrom.x, v.bridleFrom.y, v.bridleFrom.z, v.thrust, v.jet,
   ]);
 }
 function startReplay() {
@@ -464,6 +523,7 @@ function startReplay() {
   R.trail.pts.length = 0;
   CAM.shot = null;
   for (const g of R.gates) { g.state = 0; g.t = 0; g.mesh.visible = true; g.mat.uniforms.uFade.value = 1; g.mesh.scale.setScalar(1); }
+  for (const b of R.boosts) { b.state = 0; b.t = 0; }
   GAME.lastPos.set(fr[i0][1], fr[i0][2], fr[i0][3]);
 }
 function endReplay() {
@@ -493,6 +553,7 @@ function replayUpdate(dt) {
   VIS.vel.set(L(28), L(29), L(30)); VIS.heading = A[31]; VIS.prox = L(32); VIS.phaseT = L(33); VIS.up.set(L(34), L(35), L(36)).normalize();
   VIS.bridleFrom.set(L(37), L(38), L(39));
   VIS.thrust = L(40) || 0;
+  VIS.jet = L(41) || 0;
   // gates light up as the replay passes them
   const a = GAME.lastPos, b = VIS.pos;
   for (const g of R.gates) {
@@ -500,6 +561,7 @@ function replayUpdate(dt) {
     const da = (a.x - g.x) * g.n.x + (a.y - g.y) * g.n.y + (a.z - g.z) * g.n.z, db = (b.x - g.x) * g.n.x + (b.y - g.y) * g.n.y + (b.z - g.z) * g.n.z;
     if (da < 0 && db >= 0) { g.state = Math.hypot(b.x - g.x, b.y - g.y, b.z - g.z) < g.r + 3 ? 1 : 2; g.t = 0; }
   }
+  for (const bo of R.boosts) { if (bo.state === 0) { const r = ringCross(bo, a, b); if (r >= 0 && r <= bo.r + 1.5) { bo.state = 1; bo.t = 0; } } }
   GAME.lastPos.copy(VIS.pos);
   if (RP.t > RP.end + 2.5) endReplay();
 }
@@ -589,6 +651,16 @@ function drawMinimapDyn() {
     c.fillStyle = g.state === 1 ? '#3fd0c4' : g.state === 2 ? 'rgba(160,170,175,0.6)' : i === gi ? '#ff6b1a' : g.kind === 3 ? '#ffc21f' : g.kind === 2 ? '#7fe6de' : 'rgba(255,255,255,0.85)';
     c.fill();
   });
+  for (const b of R.boosts) {
+    if (b.state !== 0) continue;
+    const [x, z] = HUD.toMM(b.x, b.z);
+    c.beginPath(); c.arc(x, z, 3, 0, Math.PI * 2); c.fillStyle = '#c65bff'; c.fill();
+  }
+  if (RIVAL.on) {
+    const [x, z] = HUD.toMM(RIVAL.sim.pos.x, RIVAL.sim.pos.z);
+    c.beginPath(); c.arc(x, z, 5, 0, Math.PI * 2); c.fillStyle = '#ff4a4a'; c.fill();
+    c.strokeStyle = '#0a1418'; c.lineWidth = 1.5; c.stroke();
+  }
   const [px, pz] = HUD.toMM(VIS.pos.x, VIS.pos.z);
   c.save(); c.translate(px, pz); c.rotate(VIS.heading);
   c.fillStyle = '#ffd24a'; c.strokeStyle = '#0a1418'; c.lineWidth = 2;
@@ -635,14 +707,19 @@ function updateHud(dt) {
     $('proxv').textContent = pr < 200 ? `${Math.round(pr)} m` : '–';
     $('proxbar').style.width = `${clamp(1 - pr / 60, 0, 1) * 100}%`;
   }
-  $('btnthr').hidden = !(IS_TOUCH && s.phase === 'canopy');
+  const jetBtn = SETTINGS.jetpack && (s.phase === 'fly' || s.phase === 'exit');
+  $('btnthr').hidden = !(IS_TOUCH && (s.phase === 'canopy' || jetBtn));
+  setText('btnthr', i18n(jetBtn ? 'btn.jet' : 'btn.motor'));
+  $('btncut').hidden = !(IS_TOUCH && s.phase === 'canopy');
+  updateRaceHud();
   $('vignette').style.opacity = Math.max(pr < 12 ? (1 - pr / 12) * 0.9 : 0, (s.warn || 0) * 0.8);
   // prompts
   const P = $('prompt');
   let txt = '', blink = false, top = false;
   if (s.phase === 'ready') txt = i18n(IS_TOUCH ? 'prompt.readyTouch' : 'prompt.readyKey');
   else if ((s.phase === 'fly' || s.phase === 'exit') && s.warn > 0.35) { txt = i18n('prompt.climb'); blink = true; }
-  else if ((s.phase === 'exit' || s.phase === 'fly') && s.airT < 7) txt = i18n(IS_TOUCH ? 'prompt.earlyTouch' : 'prompt.earlyKey');
+  else if (s.phase === 'fly' && s.cutaways && s.phaseT < 4) { txt = i18n(IS_TOUCH ? 'prompt.reserveTouch' : 'prompt.reserveKey'); blink = true; }
+  else if ((s.phase === 'exit' || s.phase === 'fly') && s.airT < 7) txt = i18n((IS_TOUCH ? 'prompt.earlyTouch' : 'prompt.earlyKey') + (SETTINGS.jetpack ? 'Jet' : ''));
   else if (s.phase === 'fly' && alz < 420 && alz > 0) { txt = i18n(IS_TOUCH ? 'prompt.deployTouch' : 'prompt.deployKey'); blink = true; }
   else if (s.phase === 'canopy') {
     const feet = s.pos.y - 1.02 - ground;
@@ -774,6 +851,19 @@ function updateGates(dt) {
     }
     if (g.state === 0) { u.uColB.value.copy(GATE_WHITE); u.uFade.value = 1; }
   });
+  for (const b of R.boosts) {
+    const u = b.mat.uniforms;
+    if (b.state === 0) {
+      u.uGlow.value = 0.55 + 0.3 * Math.sin(U.uTime.value * 7 + b.x);
+      u.uFade.value = 1; b.mesh.visible = true; b.mesh.scale.setScalar(1);
+    } else {
+      b.t += dt;
+      u.uGlow.value = 1.5;
+      u.uFade.value = Math.max(0, 1 - b.t / 0.8);
+      b.mesh.scale.setScalar(1 + b.t * 1.2);
+      b.mesh.visible = u.uFade.value > 0.01;
+    }
+  }
 }
 
 // ------------------------------------------------------------ screens
@@ -828,6 +918,7 @@ async function buildWorldScene(progress) {
   buildClouds();
   buildProps();
   buildGates();
+  buildBoosts();
   buildBirds();
   buildHud();
 }
@@ -906,6 +997,8 @@ function refreshSettings() {
   $('oi').textContent = i18n(SETTINGS.invert ? 'state.yes' : 'state.no');
   $('of').textContent = i18n(SETTINGS.smoke ? 'state.on' : 'state.off');
   $('oa').textContent = i18n(SETTINGS.assist ? 'state.on' : 'state.off');
+  $('oj').textContent = i18n(SETTINGS.jetpack ? 'state.on' : 'state.off');
+  $('orace').textContent = i18n(SETTINGS.race ? 'state.on' : 'state.off');
   const st = WORLD.genStats || {};
   $('perfnote').textContent = i18n('set.perfnote', { cell: CELL0, samples: fmt(WORLD.L0.nx * WORLD.L0.nz), time: ((st.heights || 0) / 1000).toFixed(1), trees: fmt(st.trees || 0) });
 }
@@ -929,6 +1022,9 @@ function wireUi() {
   click('oi', () => { SETTINGS.invert = !SETTINGS.invert; saveSettings(); refreshSettings(); });
   click('of', () => { SETTINGS.smoke = !SETTINGS.smoke; saveSettings(); refreshSettings(); });
   click('oa', () => { SETTINGS.assist = !SETTINGS.assist; saveSettings(); refreshSettings(); });
+  click('oj', () => { SETTINGS.jetpack = !SETTINGS.jetpack; saveSettings(); refreshSettings(); });
+  // the rival joins (or leaves) from the next jump
+  click('orace', () => { SETTINGS.race = !SETTINGS.race; saveSettings(); refreshSettings(); });
   click('bagain', startPlay);
   click('bnew', () => newWorld(0, false));
   click('bnew2', () => newWorld(0, true));
@@ -941,7 +1037,11 @@ function wireUi() {
   click('bskip', endReplay);
   click('btncam', cycleCam);
   click('btnpause', () => togglePause());
+  const cut = $('btncut');
+  cut.addEventListener('touchstart', (e) => { e.preventDefault(); requestCutaway(); }, { passive: false });
+  cut.addEventListener('mousedown', requestCutaway);
 }
+function requestCutaway() { if (GAME.state === 'play' && !GAME.paused && SIM.phase === 'canopy') INPUT.cutaway = true; }
 function onKey(code) {
   initAudio();
   if (code === 'KeyH' || code === 'Slash') { toggleHelp(); return; }
@@ -958,6 +1058,7 @@ function onKey(code) {
   if (code === 'Space') { IN.actionHeld = true; action(); }
   else if (code === 'KeyR') startPlay();
   else if (code === 'KeyC') cycleCam();
+  else if (code === 'KeyX' || code === 'KeyQ') requestCutaway();
   else if (code === 'KeyF') { SETTINGS.smoke = !SETTINGS.smoke; saveSettings(); }
 }
 function onPadButton(i) {
@@ -970,6 +1071,7 @@ function onPadButton(i) {
   else if (!GAME.paused && i === 0) action();
   else if (!GAME.paused && i === 1) cycleCam();
   else if (!GAME.paused && i === 3) startPlay();
+  else if (i === 4) requestCutaway();
 }
 
 // ------------------------------------------------------------ main loop
@@ -993,11 +1095,12 @@ function loop(now) {
       if (SIM.phase === 'ready' && GAME.attractT > 3.2) doJump();
       if ((SIM.phase === 'landed' || SIM.phase === 'crashed') && SIM.phaseT > 5) { resetRun(); GAME.attractT = 0; }
     } else if (st === 'play') { if (AUTO.on) autopilot(INPUT, R.gates, dt); else readControls(dt, SIM.phase, gp); }
-    else { INPUT.pitch = INPUT.roll = 0; INPUT.brakeL = INPUT.brakeR = 0; }
+    else { INPUT.pitch = INPUT.roll = 0; INPUT.brakeL = INPUT.brakeR = 0; INPUT.thrust = 0; }
+    rivalControl(dt);
     _acc += dt;
     const h = 1 / 120;
     let n = 0;
-    while (_acc >= h && n < 14) { physicsStep(h); _acc -= h; n++; }
+    while (_acc >= h && n < 14) { physicsStep(h); rivalStep(h); _acc -= h; n++; }
     if (n >= 14) _acc = 0;
     const flying = SIM.phase === 'fly' || SIM.phase === 'exit' || SIM.phase === 'deploy' || SIM.phase === 'canopy';
     SIM.prox = flying ? proximity(SIM.pos) : 999;
@@ -1016,11 +1119,14 @@ function loop(now) {
     }
   } else if (st === 'replay') replayUpdate(dt);
   applyVis(dt);
+  rivalVisual(dt);
+  if (!GAME.paused) updateFreeCanopy(dt);
   const cam = R.camera;
   updateCamera(dt, cam, camState(), camModeNow());
   if (GAME.debugCam) { cam.position.fromArray(GAME.debugCam.p); cam.up.set(0, 1, 0); cam.lookAt(new THREE.Vector3().fromArray(GAME.debugCam.t)); cam.fov = GAME.debugCam.fov || 60; cam.updateProjectionMatrix(); }
   cam.updateMatrixWorld();
   updateLandingAids(dt, cam);
+  rivalTag(cam);
   R.sky.position.copy(cam.position);
   R.projScreen.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
   R.frustum.setFromProjectionMatrix(R.projScreen);
@@ -1029,7 +1135,8 @@ function loop(now) {
   updateTrees(cam);
   if (_frameN % 24 === 0) sortClouds(cam);
   const smoke = SETTINGS.smoke && (VIS.phase === 'fly' || VIS.phase === 'exit' || (VIS.phase === 'deploy' && VIS.phaseT < 0.5));
-  updateTrail(dt, VIS.feet, smoke || (st === 'menu' && (VIS.phase === 'fly' || VIS.phase === 'exit')), cam, U.uTime.value);
+  updateTrail(R.trail, dt, VIS.feet, smoke || (st === 'menu' && (VIS.phase === 'fly' || VIS.phase === 'exit')), cam, U.uTime.value);
+  if (RIVAL.trail.mesh.visible) updateTrail(RIVAL.trail, dt, RIVAL.vis.feet, RIVAL.vis.phase === 'fly' || RIVAL.vis.phase === 'exit', cam, U.uTime.value);
   updateSpeedLines(cam, (VIS.phase === 'fly' || VIS.phase === 'exit') && camModeNow() !== 3 ? VIS.vel : _g1.set(0, 0, 0), dt);
   updateGates(dt);
   const airborne = VIS.phase === 'fly' || VIS.phase === 'exit' || VIS.phase === 'deploy' || VIS.phase === 'canopy';
@@ -1044,7 +1151,7 @@ function loop(now) {
   }
   $('mist').style.opacity = (mistAmount(cam.position) * 0.92).toFixed(3);
   if (st === 'play') updateHud(dt);
-  updateAudio(dt, { phase: st === 'menu' ? 'menu' : VIS.phase, vel: VIS.vel, prox: VIS.prox, bank: SIM.bank, thrust: VIS.thrust });
+  updateAudio(dt, { phase: st === 'menu' ? 'menu' : VIS.phase, vel: VIS.vel, prox: VIS.prox, bank: SIM.bank, thrust: VIS.thrust, jet: GAME.paused ? 0 : VIS.jet });
   R.renderer.render(R.scene, cam);
   // adaptive resolution
   PERF.acc += dt; PERF.n++;
@@ -1065,7 +1172,9 @@ function simulate(sec, log) {
   for (let i = 0; i < n; i++) {
     GAME.lastPos.copy(SIM.pos);
     autopilot(INPUT, R.gates, h);
+    rivalControl(h);
     physicsStep(h);
+    rivalStep(h);
     if (i % 6 === 0) SIM.prox = (SIM.phase === 'fly' || SIM.phase === 'exit' || SIM.phase === 'deploy' || SIM.phase === 'canopy') ? proximity(SIM.pos) : 999;
     handleEvents();
     gameplay(h);
@@ -1107,12 +1216,15 @@ async function boot() {
     CAM.mode = SETTINGS.cam || 0;
     // things that outlive a world: sky, smoke trail, speed lines, the pilot and the canopy
     buildSky();
-    buildTrail();
+    R.trail = buildTrail();
     buildSpeedLines();
     JUMPER = new Jumper();
     R.scene.add(JUMPER.root);
     CANOPY = new Canopy();
     CANOPY.add(R.scene);
+    FREE.canopy = new Canopy();
+    FREE.canopy.add(R.scene);
+    buildRival();
     await buildWorldScene(progress);
     wireUi();
     initInput(onKey, action);
@@ -1127,9 +1239,9 @@ async function boot() {
     _lastT = performance.now();
     requestAnimationFrame(loop);
     window.__emilius = {
-      SIM, GAME, VIS, R, WORLD, INPUT, AUTO, AID, MARKS, CAM, BIRDS, SETTINGS_REF: SETTINGS,
+      SIM, GAME, VIS, R, WORLD, INPUT, AUTO, AID, MARKS, CAM, BIRDS, RIVAL, FREE, SETTINGS_REF: SETTINGS,
       get TC() { return TC; }, get SEED() { return SEED; }, get STYLE() { return STYLE; },
-      startPlay, doJump, computeScore, groundHeight, surfaceHeight, simulate, simulateFixed, resetRun, showResults, startReplay, toMenu, newWorld,
+      startPlay, doJump, computeScore, requestCutaway, raceResult, lineProgress, groundHeight, surfaceHeight, simulate, simulateFixed, resetRun, showResults, startReplay, toMenu, newWorld,
       lookFrom: (p, t, fov) => { if (p && p.length === 4) { p = [p[0], groundHeight(p[0], p[2]) + p[3], p[2]]; } GAME.debugCam = p ? { p, t, fov } : null; },
     };
   } catch (err) {
