@@ -239,16 +239,17 @@ function scrape(floor, feet, kind) {
   EVENTS.push({ type: 'scrape', kind });
 }
 
-// jetpack: pushes along the body axis (a little above the flight path) while the button is held
+// jetpack: pushes level along the direction of travel while the button is held. The extra
+// speed would make the suit balloon up, so the climb is held to a gentle one: it flies straight
+const JET_CLIMB = 1.5;                           // m/s, the most the jet lets you climb
 function stepJet(dt, inp) {
   const s = SIM;
   s.thrust = damp(s.thrust, SETTINGS.jetpack ? clamp(inp.thrust || 0, 0, 1) : 0, 6, dt);
   if (s.thrust < 0.002) return;
-  const V = s.vel.length();
-  if (V > 0.5) _v1.copy(s.vel).divideScalar(V); else headingVec(s.heading, _v1);
-  const a = s.alpha * DEG * smoothstep(0, 1, s.inflate);
-  _v1.multiplyScalar(Math.cos(a)).addScaledVector(s.liftDir, Math.sin(a));
+  const H = Math.hypot(s.vel.x, s.vel.z);
+  if (H > 0.5) _v1.set(s.vel.x / H, 0, s.vel.z / H); else headingVec(s.heading, _v1);
   s.vel.addScaledVector(_v1, JET_ACC * s.thrust * dt);
+  if (s.vel.y > JET_CLIMB) s.vel.y = damp(s.vel.y, JET_CLIMB, 40 * s.thrust, dt);
 }
 // cut the canopy away and fly the wingsuit again (the next deploy is the reserve)
 function cutaway() {
