@@ -275,7 +275,7 @@ function doJump() {
   const f = headingVec(SIM.heading, new THREE.Vector3());
   SIM.vel.copy(f).multiplyScalar(6.2); SIM.vel.y = 2.0;
   SIM.inflate = 0;
-  if (RIVAL.on) { RIVAL.jumpT = 0.25; RIVAL.t0 = SIM.time; }
+  if (RIVAL.on) { RIVAL.jumpT = RIVAL_DELAY; RIVAL.t0 = SIM.time; }
   SFX.jump();
   if (GAME.state === 'play') callout(i18n('callout.exit'), 'orange', true);
 }
@@ -352,7 +352,7 @@ function gameplay(dt) {
   const last = R.gates[R.gates.length - 1];
   if (RIVAL.on && GAME.raceT < 0 && last && last.state !== 0) {
     GAME.raceT = SIM.time - RIVAL.t0;
-    const won = RIVAL.finishT < 0 || GAME.raceT < RIVAL.finishT;
+    const won = raceWon(GAME.raceT, RIVAL.finishT);
     if (live) callout(i18n(won ? 'callout.racewin' : 'callout.racelose'), won ? 'gold' : 'orange');
   }
   if (flying || s.phase === 'deploy' || s.phase === 'canopy') {

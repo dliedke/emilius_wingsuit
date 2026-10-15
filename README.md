@@ -27,7 +27,7 @@ Inspirado no vídeo [“My Most Breathtaking Wingsuit Flight Ever – Monte Emil
 ### Jetpack, corrida e cutaway
 
 - **Jetpack na wingsuit** (`E` / `Shift`, combustível infinito): empurra para a frente; com o nariz levantado dá até para subir. Pode ser desligado em Ajustes.
-- **Corrida contra a IA**: um rival de roupa vermelha salta ao seu lado e voa a mesma linha, com jetpack. Quem cruzar o último portão primeiro vence; se você vencer e pousar bem, ganha 1000 pontos. O HUD mostra a diferença em metros, e uma etiqueta no céu mostra onde ele está. Também pode ser desligada em Ajustes.
+- **Corrida contra a IA**: um rival de roupa vermelha salta logo depois de você (1,5 s) e voa a mesma linha, sem jetpack e um pouco mais devagar: um voo limpo, ou umas rajadas de jetpack, ganha dele. Quem cruzar o último portão primeiro vence (empate no décimo de segundo conta como vitória sua); se você vencer e pousar bem, ganha 1000 pontos. O HUD mostra a diferença em metros, e uma etiqueta no céu mostra onde ele está. Também pode ser desligada em Ajustes.
 - **Cutaway** (`X` ou `Q` sob o paraquedas): você solta o paraquedas, que sai voando sozinho, e volta a voar de wingsuit. Depois é só abrir o reserva com `Espaço` (dá para repetir quantas vezes quiser). Cada cutaway vale 500 pontos se você pousar bem.
 
 ## Jogar

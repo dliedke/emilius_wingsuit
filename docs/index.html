@@ -707,7 +707,7 @@ const STRINGS = {
     'prompt.earlyTouchJet': '<small>arraste para baixo = levantar o nariz · para cima = mergulhar · segure JATO</small>',
     'help.jet': 'Jetpack: empurra para a frente, combustível infinito',
     'help.cutaway': 'Soltar o paraquedas e voltar a voar de wingsuit (abra o reserva com Espaço)',
-    'help.note3': 'Corrida: um rival de roupa vermelha salta com você e voa a mesma linha; quem cruzar o último portão primeiro vence (+1000 se você pousar bem). Os anéis roxos entre os portões dão um empurrão de velocidade.',
+    'help.note3': 'Corrida: um rival de roupa vermelha salta logo depois de você e voa a mesma linha; quem cruzar o último portão primeiro vence (+1000 se você pousar bem). Os anéis roxos entre os portões dão um empurrão de velocidade.',
     'set.jetpack': 'Jetpack na wingsuit (E ou Shift, combustível infinito)',
     'set.race': 'Corrida contra a IA (um rival voa a mesma linha)',
   },
@@ -913,7 +913,7 @@ const STRINGS = {
     'prompt.earlyTouchJet': '<small>drag down = pull the nose up · drag up = dive · hold JET</small>',
     'help.jet': 'Jetpack: pushes you forward, unlimited fuel',
     'help.cutaway': 'Cut away the parachute and fly the wingsuit again (open the reserve with Space)',
-    'help.note3': 'Race: a rival in a red suit jumps with you and flies the same line; whoever crosses the last gate first wins (+1000 if you land well). The purple rings between the gates give you a speed boost.',
+    'help.note3': 'Race: a rival in a red suit jumps right after you and flies the same line; whoever crosses the last gate first wins (+1000 if you land well). The purple rings between the gates give you a speed boost.',
     'set.jetpack': 'Wingsuit jetpack (E or Shift, unlimited fuel)',
     'set.race': 'Race against the AI (a rival flies the same line)',
   },
@@ -5046,8 +5046,9 @@ function land(water, g) {
 // ------------------------------------------------------------ autopilot
 // Flies the line: used for the menu's attract mode and the tests.
 // nudge: steer the flight path onto the gate centres (attract mode, the AI rival);
-// jetV: the rival lights its jetpack below this speed or when it sinks under the line
-let AUTO = { on: false, gate: 0, hold: null, nudge: false, jetV: 0 };
+// jetV: the rival lights its jetpack below this speed or when it sinks under the line;
+// pace: a steady pull on the stick that floats the line a little slower (the rival's handicap)
+let AUTO = { on: false, gate: 0, hold: null, nudge: false, jetV: 0, pace: 0 };
 // where to burn height before the final: over the lowest ground next to the target
 // (so a mountain shelf's slope is never in the way), a little downwind if possible
 function holdingPoint() {
@@ -5088,7 +5089,7 @@ function autopilot(inp, gates, dt) {
     const V = Math.max(1, s.vel.length());
     const gamD = Math.atan2(ty - s.pos.y, Math.max(25, dh));
     const gam = Math.asin(clamp(s.vel.y / V, -1, 1));
-    let p = clamp((gamD - gam) * 4.5 + (V < 36 ? -0.6 : 0) + (V > 62 ? 0.25 : 0), -1, 0.75);
+    let p = clamp((gamD - gam) * 4.5 + (V < 36 ? -0.6 : 0) + (V > 62 ? 0.25 : 0) + (AUTO.pace || 0), -1, 0.75);
     for (const t of [0.6, 1.2, 2.0]) {
       const fx = s.pos.x + s.vel.x * t, fz = s.pos.z + s.vel.z * t, fy = s.pos.y + s.vel.y * t;
       const clr = fy - groundHeight(fx, fz);
@@ -5600,11 +5601,16 @@ function readControls(dt, phase, gp) {
 // each step and each frame.
 const RACE_BONUS = 1000;
 const CUTAWAY_BONUS = 500;
+const RIVAL_DELAY = 1.5;   // the rival jumps this long after you
+// a finish closer than the tenth of a second the results show goes to you: never "lost by 0.0 s"
+const RACE_TIE = 0.05;
+function raceWon(me, it) { return me >= 0 && (it < 0 || me < it + RACE_TIE); }
 const RIVAL = {
   on: false,
   sim: makeSim(), inp: makeInput(), vis: null,
-  // nudged onto the gate centres; lights its jetpack below ~180 km/h or when it sinks under the line
-  auto: { on: false, gate: 0, hold: null, cT: 0, nudge: true, jetV: 50 },
+  // nudged onto the gate centres so it rarely misses one, but no jetpack and a floaty, slower line:
+  // a clean flight (or a few jetpack bursts) beats it
+  auto: { on: false, gate: 0, hold: null, cT: 0, nudge: true, jetV: 0, pace: 0.2 },
   jumper: null, canopy: null, trail: null,
   next: 0, gates: 0, t0: 0, jumpT: -1, finishT: -1, out: false, lead: 0, hudT: 0,
 };
@@ -5719,8 +5725,10 @@ function lineProgress(p) {
 function raceResult() {
   if (!RIVAL.on) return { on: false, won: false, margin: -1 };
   const me = GAME.raceT, it = RIVAL.finishT;
-  const won = me >= 0 && (it < 0 || me < it);
-  return { on: true, won, margin: me >= 0 && it >= 0 ? Math.abs(it - me) : -1 };
+  const won = raceWon(me, it);
+  // a dead heat reads as a plain win
+  const margin = me >= 0 && it >= 0 && Math.abs(it - me) >= RACE_TIE ? Math.abs(it - me) : -1;
+  return { on: true, won, margin };
 }
 function updateRaceHud() {
   if (!RIVAL.on) return;
@@ -5728,8 +5736,8 @@ function updateRaceHud() {
   let txt, cls = '';
   const me = GAME.raceT, it = RIVAL.finishT;
   if (me >= 0) {
-    const won = it < 0 || me < it;
-    txt = i18n(won ? 'race.first' : 'race.second') + (it >= 0 ? ` · ${won ? '−' : '+'}${Math.abs(it - me).toFixed(1)} s` : '');
+    const won = raceWon(me, it);
+    txt = i18n(won ? 'race.first' : 'race.second') + (it >= 0 && Math.abs(it - me) >= RACE_TIE ? ` · ${won ? '−' : '+'}${Math.abs(it - me).toFixed(1)} s` : '');
     cls = won ? 'ahead' : 'behind';
   } else if (it >= 0) { txt = i18n('race.second'); cls = 'behind'; }
   else if (RIVAL.out) { txt = i18n('race.out'); cls = 'ahead'; }
@@ -6091,7 +6099,7 @@ function doJump() {
   const f = headingVec(SIM.heading, new THREE.Vector3());
   SIM.vel.copy(f).multiplyScalar(6.2); SIM.vel.y = 2.0;
   SIM.inflate = 0;
-  if (RIVAL.on) { RIVAL.jumpT = 0.25; RIVAL.t0 = SIM.time; }
+  if (RIVAL.on) { RIVAL.jumpT = RIVAL_DELAY; RIVAL.t0 = SIM.time; }
   SFX.jump();
   if (GAME.state === 'play') callout(i18n('callout.exit'), 'orange', true);
 }
@@ -6168,7 +6176,7 @@ function gameplay(dt) {
   const last = R.gates[R.gates.length - 1];
   if (RIVAL.on && GAME.raceT < 0 && last && last.state !== 0) {
     GAME.raceT = SIM.time - RIVAL.t0;
-    const won = RIVAL.finishT < 0 || GAME.raceT < RIVAL.finishT;
+    const won = raceWon(GAME.raceT, RIVAL.finishT);
     if (live) callout(i18n(won ? 'callout.racewin' : 'callout.racelose'), won ? 'gold' : 'orange');
   }
   if (flying || s.phase === 'deploy' || s.phase === 'canopy') {

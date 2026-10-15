@@ -5,11 +5,16 @@
 // each step and each frame.
 const RACE_BONUS = 1000;
 const CUTAWAY_BONUS = 500;
+const RIVAL_DELAY = 1.5;   // the rival jumps this long after you
+// a finish closer than the tenth of a second the results show goes to you: never "lost by 0.0 s"
+const RACE_TIE = 0.05;
+function raceWon(me, it) { return me >= 0 && (it < 0 || me < it + RACE_TIE); }
 const RIVAL = {
   on: false,
   sim: makeSim(), inp: makeInput(), vis: null,
-  // nudged onto the gate centres; lights its jetpack below ~180 km/h or when it sinks under the line
-  auto: { on: false, gate: 0, hold: null, cT: 0, nudge: true, jetV: 50 },
+  // nudged onto the gate centres so it rarely misses one, but no jetpack and a floaty, slower line:
+  // a clean flight (or a few jetpack bursts) beats it
+  auto: { on: false, gate: 0, hold: null, cT: 0, nudge: true, jetV: 0, pace: 0.2 },
   jumper: null, canopy: null, trail: null,
   next: 0, gates: 0, t0: 0, jumpT: -1, finishT: -1, out: false, lead: 0, hudT: 0,
 };
@@ -124,8 +129,10 @@ function lineProgress(p) {
 function raceResult() {
   if (!RIVAL.on) return { on: false, won: false, margin: -1 };
   const me = GAME.raceT, it = RIVAL.finishT;
-  const won = me >= 0 && (it < 0 || me < it);
-  return { on: true, won, margin: me >= 0 && it >= 0 ? Math.abs(it - me) : -1 };
+  const won = raceWon(me, it);
+  // a dead heat reads as a plain win
+  const margin = me >= 0 && it >= 0 && Math.abs(it - me) >= RACE_TIE ? Math.abs(it - me) : -1;
+  return { on: true, won, margin };
 }
 function updateRaceHud() {
   if (!RIVAL.on) return;
@@ -133,8 +140,8 @@ function updateRaceHud() {
   let txt, cls = '';
   const me = GAME.raceT, it = RIVAL.finishT;
   if (me >= 0) {
-    const won = it < 0 || me < it;
-    txt = i18n(won ? 'race.first' : 'race.second') + (it >= 0 ? ` · ${won ? '−' : '+'}${Math.abs(it - me).toFixed(1)} s` : '');
+    const won = raceWon(me, it);
+    txt = i18n(won ? 'race.first' : 'race.second') + (it >= 0 && Math.abs(it - me) >= RACE_TIE ? ` · ${won ? '−' : '+'}${Math.abs(it - me).toFixed(1)} s` : '');
     cls = won ? 'ahead' : 'behind';
   } else if (it >= 0) { txt = i18n('race.second'); cls = 'behind'; }
   else if (RIVAL.out) { txt = i18n('race.out'); cls = 'ahead'; }

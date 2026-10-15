@@ -356,8 +356,9 @@ function land(water, g) {
 // ------------------------------------------------------------ autopilot
 // Flies the line: used for the menu's attract mode and the tests.
 // nudge: steer the flight path onto the gate centres (attract mode, the AI rival);
-// jetV: the rival lights its jetpack below this speed or when it sinks under the line
-let AUTO = { on: false, gate: 0, hold: null, nudge: false, jetV: 0 };
+// jetV: the rival lights its jetpack below this speed or when it sinks under the line;
+// pace: a steady pull on the stick that floats the line a little slower (the rival's handicap)
+let AUTO = { on: false, gate: 0, hold: null, nudge: false, jetV: 0, pace: 0 };
 // where to burn height before the final: over the lowest ground next to the target
 // (so a mountain shelf's slope is never in the way), a little downwind if possible
 function holdingPoint() {
@@ -398,7 +399,7 @@ function autopilot(inp, gates, dt) {
     const V = Math.max(1, s.vel.length());
     const gamD = Math.atan2(ty - s.pos.y, Math.max(25, dh));
     const gam = Math.asin(clamp(s.vel.y / V, -1, 1));
-    let p = clamp((gamD - gam) * 4.5 + (V < 36 ? -0.6 : 0) + (V > 62 ? 0.25 : 0), -1, 0.75);
+    let p = clamp((gamD - gam) * 4.5 + (V < 36 ? -0.6 : 0) + (V > 62 ? 0.25 : 0) + (AUTO.pace || 0), -1, 0.75);
     for (const t of [0.6, 1.2, 2.0]) {
       const fx = s.pos.x + s.vel.x * t, fz = s.pos.z + s.vel.z * t, fy = s.pos.y + s.vel.y * t;
       const clr = fy - groundHeight(fx, fz);
